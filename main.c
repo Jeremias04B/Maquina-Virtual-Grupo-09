@@ -87,9 +87,9 @@ int main(int argc, char *argv[]) {
 
     //inicializar los registros obligatorios de arranque
     // los codigos de registro estan en la tabla: IP es 0, CS es 26, DS es 27
-    vm.registros[26] = 0x00000000; // CS: segmento 0, offset 0
-    vm.registros[27] = 0x00010000; // DS: segmento 1, offset 0
-    vm.registros[0]  = vm.registros[26]; // IP apunta a la primera instruccion del codigo
+    vm.registros[REG_CS] = 0x00000000; // CS: segmento 0, offset 0
+    vm.registros[REG_DS] = 0x00010000; // DS: segmento 1, offset 0
+    vm.registros[REG_IP]  = vm.registros[REG_CS]; // IP apunta a la primera instruccion del codigo
 
     //segun el modo de ejecucion
     if (modo_disassembler) {
