@@ -90,3 +90,20 @@ void actualizarCC(MaquinaVirtual *vm, int64_t result, bool check_overflow, bool 
     vm->registros[REG_CC] = cc;
 }
 
+char configmodo(int16_t v){
+    switch (v){
+        case (16): return 'B';
+        break;
+        case(8):return 'X';
+        break;
+        case(4): return 'O';
+        break;
+        case(2): return 'c';
+        break;
+        case(1): return 'd';
+        break;
+        
+        default: printf("MODO INVALIDO");
+    }
+}
+
