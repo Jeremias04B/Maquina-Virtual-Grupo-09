@@ -3,8 +3,9 @@
 #include <stdint.h>
 #include <string.h>
 #include "maquinaV.h" 
-#include "ejecucion.c"
 
+void disassemble(const uint8_t *code, uint16_t codeSize);
+void ciclo_ejecucion(MaquinaVirtual *vm);
 int main(int argc, char *argv[]) {
     //validar argumentos de invocacion: vmx filename.vmx [-d]
     if (argc < 2 || argc > 3) {
@@ -93,8 +94,7 @@ int main(int argc, char *argv[]) {
 
     //segun el modo de ejecucion
     if (modo_disassembler) {
-        // pasamos la direccion de memoria de la maquina por referencia para no copiar todo el struct
-        desensamblar(&vm, tamano_codigo); 
+       disassemble(vm.memoria, tamano_codigo);
     } else {
         ciclo_ejecucion(&vm);
     }
