@@ -3,6 +3,16 @@
 #include "maquinaV.h"
 #include "instrucciones.h"
 
+void ejecutar_instruccion(MaquinaVirtual *vm) {
+        uint32_t opcode = vm->registros[REG_OPC];
+        if (opcode < 32) {
+            vectorIns[opcode](vm);
+        } 
+        else {
+            INVALID(vm); 
+        }
+}
+
 void ciclo_ejecucion(MaquinaVirtual *vm){
 
     //[0] del registro es el IP. el STOP pone el ip en -1
@@ -52,14 +62,6 @@ void ciclo_ejecucion(MaquinaVirtual *vm){
         
         ejecutar_instruccion(vm);
     }
-    
-    void ejecutar_instruccion(MaquinaVirtual *vm) {
-        uint32_t opcode = vm->registros[REG_OPC];
-        if (opcode < 32) {
-            vectorIns[opcode](vm);
-        } 
-        else {
-            INVALID(vm); 
-        }
-    }
 }
+
+
