@@ -53,7 +53,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
-#include <maquinaV.h>   
+#include "maquinaV.h" 
 /* ---------- Nombres de registros (32 registros, código 0-31) ---------- */
 static const char *regNames[32] = {
     "IP", "OPC", "OP1", "OP2", "LAR", "MAR", "MBR", "R07",
@@ -212,7 +212,7 @@ static int decodificar_instruccion(const uint8_t *code, uint16_t codeSize,
 }
 
 /* Recorre TODO el segmento de código e imprime el disassembler. */
-void disassemble(const uint8_t *code, uint16_t codeSize) {
+void desensamblar(const uint8_t *code, uint16_t codeSize) {
     uint16_t addr = 0;
 
     while (addr < codeSize) {
@@ -292,7 +292,7 @@ int main(int argc, char *argv[]) {
     }
     fclose(f);
 
-    disassemble(code, codeSize);
+    desensamblar(code, codeSize);
 
     free(code);
     return 0;
