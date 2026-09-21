@@ -74,16 +74,16 @@ int main(int argc, char *argv[]) {
     // configurar la tabla de descriptores de segmentos (8 entradas)
     // entrada 0 (CS): base = 0, tamaño = tamaño del codigo
     vm.TablaSegmentos[0].base = 0x0000;
-    vm.TablaSegmentos[0].tamano = tamano_codigo;
+    vm.TablaSegmentos[0].size = tamano_codigo;
 
     // entrada 1 (DS): base = tamaño del codigo, Tamaño = resto de la memoria
     vm.TablaSegmentos[1].base = tamano_codigo;
-    vm.TablaSegmentos[1].tamano = 16384 - tamano_codigo;
+    vm.TablaSegmentos[1].size = 16384 - tamano_codigo;
 
     // entradas 2 a 7: Sin uso (-1 o 0xFFFFFFFF)
     for (int i = 2; i < 8; i++) {
         vm.TablaSegmentos[i].base = 0xFFFF;   
-        vm.TablaSegmentos[i].tamano = 0xFFFF; 
+        vm.TablaSegmentos[i].size = 0xFFFF; 
     }
 
     //inicializar los registros obligatorios de arranque
