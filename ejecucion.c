@@ -6,7 +6,7 @@
 void ciclo_ejecucion(MaquinaVirtual *vm){
 
     //[0] del registro es el IP. el STOP pone el ip en -1
-    while ( (vm->registros[REG_IP] != 0xFFFFFFFF) && ((vm->registros[REG_IP] & 0xFFFF) < vm->TablaSegmentos[REG_IP].tamano) ) {
+    while ( (vm->registros[REG_IP] != 0xFFFFFFFF) && ((vm->registros[REG_IP] & 0xFFFF) < vm->TablaSegmentos[REG_IP].size) ) {
 
         // 1. traduccion de la direccion logica (IP) a fisica
         uint16_t segmento = (vm->registros[REG_IP] >> 16) & 0xFFFF; // extrae los 2 bytes altos (Segmento)
