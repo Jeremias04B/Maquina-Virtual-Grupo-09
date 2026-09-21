@@ -45,14 +45,14 @@ int main(int argc, char *argv[]) {
     }
 
     // Leer los 2 bytes del tamaño del codigo
-    uint16_t size_codigo = 0;
-    if (fread(&size_codigo, sizeof(uint16_t), 1, archivo) != 1) {
-        fprintf(stderr, "Error al leer el size del codigo\n");
+    uint16_t tamano_codigo = 0;
+    if (fread(&tamano_codigo, sizeof(uint16_t), 1, archivo) != 1) {
+        fprintf(stderr, "Error al leer el tamano del codigo\n");
         fclose(archivo);
         return 1;
     }
 
-    if (size_codigo > 16384) { // Verifica que no exceda los 16 KiB
+    if (tamano_codigo > 16384) { // Verifica que no exceda los 16 KiB
         fprintf(stderr, "Error: El size del codigo excede la memoria disponible\n");
         fclose(archivo);
         return 1;
@@ -63,7 +63,7 @@ int main(int argc, char *argv[]) {
     memset(&vm, 0, sizeof(MaquinaVirtual)); 
 
     // cargar el codigo binario en la memoria RAM (a partir de la posicion 0)
-    if (fread(vm.memoria, sizeof(uint8_t), size_codigo, archivo) != size_codigo) {
+    if (fread(vm.memoria, sizeof(uint8_t), tamano_codigo, archivo) != tamano_codigo) {
         fprintf(stderr, "Error al leer las instrucciones del archivo\n");
         fclose(archivo);
         return 1;
@@ -73,11 +73,11 @@ int main(int argc, char *argv[]) {
     // configurar la tabla de descriptores de segmentos (8 entradas)
     // entrada 0 (CS): base = 0, tamaño = tamaño del codigo
     vm.TablaSegmentos[0].base = 0x0000;
-    vm.TablaSegmentos[0].size = size_codigo;
+    vm.TablaSegmentos[0].size = tamano_codigo;
 
     // entrada 1 (DS): base = tamaño del codigo, Tamaño = resto de la memoria
-    vm.TablaSegmentos[1].base = size_codigo;
-    vm.TablaSegmentos[1].size = 16384 - size_codigo;
+    vm.TablaSegmentos[1].base = tamano_codigo;
+    vm.TablaSegmentos[1].size = 16384 - tamano_codigo;
 
     // entradas 2 a 7: Sin uso (-1 o 0xFFFFFFFF)
     for (int i = 2; i < 8; i++) {
@@ -94,7 +94,7 @@ int main(int argc, char *argv[]) {
     //segun el modo de ejecucion
     if (modo_disassembler) {
         // pasamos la direccion de memoria de la maquina por referencia para no copiar todo el struct
-        desensamblar(&vm, size_codigo); 
+        desensamblar(&vm, tamano_codigo); 
     } else {
         ciclo_ejecucion(&vm);
     }
