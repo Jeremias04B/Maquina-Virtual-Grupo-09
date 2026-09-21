@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <string.h>
 #include "maquinaV.h" 
+#include "funciones.h"
 
 int main(int argc, char *argv[]) {
     //validar argumentos de invocacion: vmx filename.vmx [-d]

@@ -1,6 +1,6 @@
 
 #include "maquinaV.h"
-
+#include "funciones.h"
 
 void SUB(MaquinaVirtual *vm) {
     int32_t a = getValorOP(vm, vm->registros[REG_OP1]);

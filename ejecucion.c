@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "maquinaV.h"
+#include "funciones.h"
 
 void ciclo_ejecucion(MaquinaVirtual *vm){
 
