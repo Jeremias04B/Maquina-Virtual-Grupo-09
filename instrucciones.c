@@ -303,7 +303,7 @@ void SYS(MaquinaVirtual *vm) {
     } else if (sys_code == 2) {
         sys_write(vm);
     } else {
-        fprintf(stderr, "Error: Llamada al sistema inválida (%d)\n", sys_code);
+        fprintf(stderr, "Error: Llamada al sistema  (%d)\n", sys_code);
         exit(1);
     }
 }

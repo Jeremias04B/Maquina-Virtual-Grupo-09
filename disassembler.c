@@ -211,7 +211,7 @@ static int decodificar_instruccion(const uint8_t *code, uint16_t codeSize, uint1
 }
 
 /* Recorre TODO el segmento de código e imprime el disassembler. */
-void desensamblar(const uint8_t *code, uint16_t codeSize) {
+void disassemble(const uint8_t *code, uint16_t codeSize) {
     uint16_t addr = 0;
 
     while (addr < codeSize) {
