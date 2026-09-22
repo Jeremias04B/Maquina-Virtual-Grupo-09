@@ -57,7 +57,7 @@ int main(int argc, char *argv[]) {
     uint16_t tamano_codigo = ((uint16_t)tam_bytes[0] << 8) | tam_bytes[1];
 
     if (tamano_codigo > 16384) { // Verifica que no exceda los 16 KiB
-        fprintf(stderr, "Error: El tamano del codigo excede la memoria disponible\n");
+        fprintf(stderr, "Error: El size del codigo excede la memoria disponible\n");
         fclose(archivo);
         return 1;
     }
