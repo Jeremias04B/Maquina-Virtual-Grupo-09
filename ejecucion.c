@@ -26,15 +26,24 @@ void ciclo_ejecucion(MaquinaVirtual *vm){
 
         uint8_t primer_byte = vm->memoria[dir_fisica];
 
-        //guardo el codigo de operacion
-        vm->registros[REG_OPC]=primer_byte & 0x1F;  
+        int bit4 = (primer_byte >> 4) & 1;
+        uint32_t tipo_opA, tipo_opB;
 
-        uint32_t tipo_opA = (primer_byte & 0x30) >> 4;
-        // //ubicarlos en el byte más alto de OP1
+        if (bit4) {
+            // ---- dos operandos: tipo B en bits7-6, tipo A en bits5-4 ----
+            vm->registros[REG_OPC] = 0x10 | (primer_byte & 0x0F);
+            tipo_opB = (primer_byte >> 6) & 0x3;
+            tipo_opA = (primer_byte >> 4) & 0x3;
+        } else {
+            // ---- uno o cero operandos: el (único) tipo está en bits7-6 ----
+            uint8_t op5 = primer_byte & 0x1F;
+            vm->registros[REG_OPC] = op5;
+            tipo_opB = 0; // no existe operando B
+            tipo_opA = (op5 == 0x0F) ? 0 : ((primer_byte >> 6) & 0x3); // STOP no tiene operando
+        }
+
+        // ubicarlos en el byte más alto de OP1 y OP2
         vm->registros[REG_OP1] = tipo_opA << 24;
-
-        uint32_t tipo_opB = (primer_byte & 0xC0) >> 6;
-        //ubicarlos en el byte ms alto de OP2
         vm->registros[REG_OP2] = tipo_opB << 24;
 
         int offset_instruccion = 1; 
@@ -63,5 +72,3 @@ void ciclo_ejecucion(MaquinaVirtual *vm){
         ejecutar_instruccion(vm);
     }
 }
-
-

@@ -1,3 +1,7 @@
+#pragma once
+
+#ifndef MAQUINAV_H
+#define MAQUINAV_H
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -43,4 +47,4 @@ typedef struct {
     SegmentDescriptor TablaSegmentos[8];    // Tabla de segmentos- segmentdescriptor nombre provisorio
 } MaquinaVirtual;
 
-
+#endif /* MAQUINAV_H */

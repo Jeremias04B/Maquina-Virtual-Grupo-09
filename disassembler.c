@@ -53,7 +53,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
-#include <maquinaV.h>   
+#include "maquinaV.h"   
 /* ---------- Nombres de registros (32 registros, código 0-31) ---------- */
 static const char *regNames[32] = {
     "IP", "OPC", "OP1", "OP2", "LAR", "MAR", "MBR", "R07",

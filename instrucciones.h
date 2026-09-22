@@ -1,3 +1,5 @@
+#ifndef INSTRUCCIONES_H
+#define INSTRUCCIONES_H
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -38,13 +40,6 @@ void STOP(MaquinaVirtual *vm);
 void INVALID(MaquinaVirtual *vm);
 
 typedef void (*PInstrucciones)(MaquinaVirtual *mv);
-PInstrucciones vectorIns[32] = {
-    [0x00] = SYS,     [0x01] = JMP,     [0x02] = JP,      [0x03] = JN,
-    [0x04] = JZ,      [0x05] = JC,      [0x06] = JV,      [0x07] = JNP,
-    [0x08] = JNN,     [0x09] = JNZ,     [0x0A] = NOT,     [0x0B] = INVALID,
-    [0x0C] = INVALID, [0x0D] = INVALID, [0x0E] = INVALID, [0x0F] = STOP,
-    [0x10] = MOV,     [0x11] = ADD,     [0x12] = SUB,     [0x13] = MUL,
-    [0x14] = DIV,     [0x15] = CMP,     [0x16] = AND,     [0x17] = OR,
-    [0x18] = XOR,     [0x19] = SWAP,    [0x1A] = SHL,     [0x1B] = SHR,
-    [0x1C] = SAR,     [0x1D] = LDL,     [0x1E] = LDH,     [0x1F] = RND
-};
+
+extern PInstrucciones vectorIns[32]; 
+#endif
