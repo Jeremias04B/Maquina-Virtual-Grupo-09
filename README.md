@@ -3,5 +3,5 @@
 INTEGRANTES:
 
 -Jeremías Joaquín Bernardi
--Uriel Aristegui
+-Nestor Uriel Aristegui
 -Agustin Veca

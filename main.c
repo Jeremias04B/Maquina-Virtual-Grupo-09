@@ -45,13 +45,16 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    // Leer los 2 bytes del tamaño del codigo
-    uint16_t tamano_codigo = 0;
-    if (fread(&tamano_codigo, sizeof(uint16_t), 1, archivo) != 1) {
+    // Leer los 2 bytes del tamaño del codigo (el archivo los guarda en
+    // big-endian: primero el byte alto, despues el bajo -- por eso NO se
+    // puede leer directo a un uint16_t, hay que armarlo a mano)
+    uint8_t tam_bytes[2];
+    if (fread(tam_bytes, sizeof(uint8_t), 2, archivo) != 2) {
         fprintf(stderr, "Error al leer el tamano del codigo\n");
         fclose(archivo);
         return 1;
     }
+    uint16_t tamano_codigo = ((uint16_t)tam_bytes[0] << 8) | tam_bytes[1];
 
     if (tamano_codigo > 16384) { // Verifica que no exceda los 16 KiB
         fprintf(stderr, "Error: El size del codigo excede la memoria disponible\n");

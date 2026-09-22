@@ -1,0 +1,33 @@
+INICIO: MOV EAX, 0x01        ; modo lectura decimal
+    	MOV EDX, DS
+    	LDH ECX, 4
+    	LDL ECX, 1
+    	SYS 0x1               ; N queda en [DS]
+		
+		MOV EFX, [DS]
+		MOV EBX, 1
+		MOV ECX, 1
+
+LOOP: CMP ECX, EFX
+	JP FIN
+	MOV EAX, 0
+    XOR AC, AC
+
+MULTI: CMP AC, ECX
+	JZ FACTORIAL
+
+	ADD EAX, EBX
+	ADD, AC, 1
+	JMP MULTI
+
+FACTORIAL: ADD, ECX 1
+		MOV EBX, EAX
+		JMP LOOP
+
+FIN: MOV EDX, DS
+	MOV [EDX], EBX
+	MOV EAX, 0x01
+	LDL ECX, 1
+	LDH ECX, 4
+	SYS 0x02
+	STOP
