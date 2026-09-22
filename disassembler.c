@@ -151,8 +151,7 @@ typedef struct {
 
 /* Decodifica UNA instrucción ubicada en code[addr].
  * Devuelve 1 si es válida, 0 si es inválida o excede el segmento. */
-static int decodificar_instruccion(const uint8_t *code, uint16_t codeSize,
-                                    uint16_t addr, InstrDecodificada *out) {
+static int decodificar_instruccion(const uint8_t *code, uint16_t codeSize, uint16_t addr, InstrDecodificada *out) {
     memset(out, 0, sizeof(*out));
     out->addr = addr;
 
@@ -249,53 +248,3 @@ void desensamblar(const uint8_t *code, uint16_t codeSize) {
     }
 }
 
-/* ============================================================
- * Lectura del archivo .vmx (cabecera + carga a memoria)
- * Esta parte es un ejemplo standalone para poder probar el
- * disassembler; el resto del equipo puede reemplazarla por la
- * carga que ya tengan hecha en su VM y llamar directamente a
- * disassemble(codigo, tamanioCodigo).
- * ============================================================ */
-int main(int argc, char *argv[]) {
-    if (argc < 2) {
-        fprintf(stderr, "Uso: %s archivo.vmx\n", argv[0]);
-        return 1;
-    }
-
-    FILE *f = fopen(argv[1], "rb");
-    if (!f) {
-        fprintf(stderr, "No se pudo abrir %s\n", argv[1]);
-        return 1;
-    }
-
-    uint8_t header[8];
-    if (fread(header, 1, 8, f) != 8) {
-        fprintf(stderr, "Archivo demasiado chico para tener cabecera valida\n");
-        fclose(f);
-        return 1;
-    }
-
-    if (memcmp(header, "VMX26", 5) != 0) {
-        fprintf(stderr, "Identificador invalido (se esperaba VMX26)\n");
-        fclose(f);
-        return 1;
-    }
-
-    uint8_t version = header[5];
-    uint16_t codeSize = (header[6] << 8) | header[7];
-    (void)version;
-
-    uint8_t *code = malloc(codeSize);
-    if (fread(code, 1, codeSize, f) != codeSize) {
-        fprintf(stderr, "El archivo no contiene los %u bytes de codigo indicados\n", codeSize);
-        free(code);
-        fclose(f);
-        return 1;
-    }
-    fclose(f);
-
-    desensamblar(code, codeSize);
-
-    free(code);
-    return 0;
-}

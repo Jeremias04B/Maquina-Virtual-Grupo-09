@@ -30,7 +30,7 @@ uint16_t traducirD(MaquinaVirtual *vm, uint32_t dirLogica, uint16_t access_bytes
     vm->registros[REG_MAR] = ((uint32_t)access_bytes << 16) | dirFisica;
 
     return dirFisica;
-} // funcion de uriel
+} 
 
 int32_t read_mem32(MaquinaVirtual *vm, uint16_t dirFisica) {
     int32_t val = 0;
@@ -39,7 +39,7 @@ int32_t read_mem32(MaquinaVirtual *vm, uint16_t dirFisica) {
     } //leer byte a byte
     vm->registros[REG_MBR] = val;
     return val;
-} // funcion de uriel
+} 
 
 void write_mem32(MaquinaVirtual *vm, uint16_t dirFisica, int32_t val) {
     vm->registros[REG_MBR] = val;
