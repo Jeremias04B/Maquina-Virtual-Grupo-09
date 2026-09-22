@@ -3,7 +3,7 @@
 #include <stdint.h> 
 #include "maquinaV.h"
 #include "instrucciones.h"
-
+#include "funciones.h"
 
 uint16_t traducirD(MaquinaVirtual *vm, uint32_t dirLogica, uint16_t access_bytes) { // access_bytes representa la cantidad de bytes que se van a leer o escribir en la memoria
     uint16_t segmento = (dirLogica >> 16) & 0xFFFF; // 2 bytes +sig
@@ -57,9 +57,11 @@ int32_t getValorOP(MaquinaVirtual *vm, uint32_t reg_op) {
             return vm->registros[val & 0x1F];
         case 0x02: // Inmediato (16 bits signed)
             return (int16_t)(val & 0xFFFF);
-        case 0x03: // Memoria (Dirección Lógica) {
+        case 0x03: // Memoria (Dirección Lógica) 
+        {
             uint16_t phys = traducirD(vm, val, 4);
             return read_mem32(vm, phys);
+        }
         default:
             return 0;
     }

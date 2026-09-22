@@ -1,5 +1,36 @@
 
 #include "maquinaV.h"
+#include "funciones.h"
+#include "instrucciones.h"
+PInstrucciones vectorIns[32] = {
+    [0x00] = SYS,     [0x01] = JMP,     [0x02] = JP,      [0x03] = JN,
+    [0x04] = JZ,      [0x05] = JC,      [0x06] = JV,      [0x07] = JNP,
+    [0x08] = JNN,     [0x09] = JNZ,     [0x0A] = NOT,     [0x0B] = INVALID,
+    [0x0C] = INVALID, [0x0D] = INVALID, [0x0E] = INVALID, [0x0F] = STOP,
+    [0x10] = MOV,     [0x11] = ADD,     [0x12] = SUB,     [0x13] = MUL,
+    [0x14] = DIV,     [0x15] = CMP,     [0x16] = AND,     [0x17] = OR,
+    [0x18] = XOR,     [0x19] = SWAP,    [0x1A] = SHL,     [0x1B] = SHR,
+    [0x1C] = SAR,     [0x1D] = LDL,     [0x1E] = LDH,     [0x1F] = RND
+};
+    void MOV(MaquinaVirtual *vm) {
+        int32_t b = getValorOP(vm, vm->registros[REG_OP2]);
+        setValor(vm, vm->registros[REG_OP1], b);
+        actualizarCC(vm, b, false, false); // MOV no genera acarreo ni desbordamiento, solo copia
+    }
+ 
+    void ADD(MaquinaVirtual *vm) {
+        int32_t a = getValorOP(vm, vm->registros[REG_OP1]);
+        int32_t b = getValorOP(vm, vm->registros[REG_OP2]);
+        int64_t res = (int64_t)a + b;
+ 
+        // desbordamiento con signo: mismo signo en A y B, pero el resultado cambia de signo
+        bool v = ((a > 0 && b > 0 && (int32_t)res < 0) || (a < 0 && b < 0 && (int32_t)res >= 0));
+        // acarreo: la suma sin signo de 32 bits no entra en 32 bits (se necesitaría un bit 33)
+        bool c = (((uint64_t)(uint32_t)a + (uint32_t)b) > 0xFFFFFFFFULL);
+ 
+        setValor(vm, vm->registros[REG_OP1], (int32_t)res);
+        actualizarCC(vm, res, v, c);
+    }
 
     void SUB(MaquinaVirtual *vm) {
         int32_t a = getValorOP(vm, vm->registros[REG_OP1]);

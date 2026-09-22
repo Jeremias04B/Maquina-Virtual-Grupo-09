@@ -1,0 +1,40 @@
+INICIO: MOV EDX, DS
+	LDL ECX, [200]
+	LDH ECX, 4
+	MOV EAX, 0x01
+	ADD EDX, 104
+
+	SYS 0x01
+	MOV EAX, [DS+104] 
+	MOV ECX, 1
+
+OTRO:   CMP ECX, [200] 
+	 JZ FIN 
+	MOV EBX, ECX
+	MUL EBX, 4
+	ADD EBX, 104
+	ADD EBX, DS
+	CMP [EBX], EAX  
+	JP MAXIMO
+	JZ APARICIONES_MAXIMO
+	JMP SIGUIENTE
+	
+MAXIMO: MOV EAX, [EBX]
+	MOV EFX, 1
+	JMP SIGUIENTE
+
+APARICIONES_MAXIMO:	ADD EFX,1
+		JMP SIGUIENTE
+		JMP OTRO
+SIGUIENTE: ADD ECX, 1
+	JMP OTRO
+
+FIN: MOV EDX, DS
+    MOV [EDX], EAX          ; guardo el máximo
+    MOV [EDX+4], EFX          ; guardo la cantidad de apariciones
+    MOV EAX, 0x01
+    LDL ECX, 2
+    LDH ECX, 4
+    SYS 0x02
+    STOP
+		
