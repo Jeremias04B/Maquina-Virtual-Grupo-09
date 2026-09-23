@@ -47,7 +47,16 @@ void write_mem32(MaquinaVirtual *vm, uint16_t dirFisica, int32_t val) {
     }
 }
 
-// Obtener valor de operando según su tipo en OP1/OP2
+// Función auxiliar para resolver la dirección lógica real de un operando de memoria
+uint32_t resolver_direccion_logica(MaquinaVirtual *vm, uint32_t op_val) {
+    uint8_t cod_reg = op_val & 0x1F;                 // 5 bits menos significativos (registro)
+    int16_t offset  = (int16_t)((op_val >> 8) & 0xFFFF); // 16 bits de desplazamiento con signo
+    
+    // Obtener el puntero lógico contenido en el registro y sumarle el desplazamiento
+    uint32_t dir_base = vm->registros[cod_reg];
+    return dir_base + offset;
+}
+
 int32_t getValorOP(MaquinaVirtual *vm, uint32_t reg_op) {
     uint8_t tipo = (reg_op >> 24) & 0xFF;
     uint32_t val = reg_op & 0x00FFFFFF;  
@@ -57,10 +66,14 @@ int32_t getValorOP(MaquinaVirtual *vm, uint32_t reg_op) {
             return vm->registros[val & 0x1F];
         case 0x02: // Inmediato (16 bits signed)
             return (int16_t)(val & 0xFFFF);
-        case 0x03: // Memoria (Dirección Lógica) 
+        case 0x03: // Memoria (3 bytes empaquetados)
         {
-            uint16_t phys = traducirD(vm, val, 4);
-            return read_mem32(vm, phys);
+            uint32_t dirLogica = resolver_direccion_logica(vm, val);
+            uint16_t phys = traducirD(vm, dirLogica, 4);
+            
+            int32_t dato = read_mem32(vm, phys);
+            vm->registros[REG_MBR] = dato; // Cargar MBR según especificación
+            return dato;
         }
         default:
             return 0;
@@ -75,7 +88,10 @@ void setValor(MaquinaVirtual *vm, uint32_t reg_op, int32_t val) {
     if (tipo == 0x01) { // Registro
         vm->registros[target & 0x1F] = val;
     } else if (tipo == 0x03) { // Memoria
-        uint16_t phys = traducirD(vm, target, 4);
+        uint32_t dirLogica = resolver_direccion_logica(vm, target);
+        uint16_t phys = traducirD(vm, dirLogica, 4);
+        
+        vm->registros[REG_MBR] = val; // Cargar MBR según especificación
         write_mem32(vm, phys, val);
     }
 }
