@@ -1,4 +1,3 @@
-
 #include "maquinaV.h"
 #include "funciones.h"
 #include "instrucciones.h"
