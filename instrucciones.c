@@ -291,7 +291,7 @@ void RET(MaquinaVirtual *vm) {
     uint16_t dir = translate_address(vm, vm->registros[REG_SP], 4);
 
     int32_t ret_ip = 0;
-    ret_ip |= ((int32_t)vm-><memoria>[dir])     << 24;
+    ret_ip |= ((int32_t)vm->memoria[dir])     << 24;
     ret_ip |= ((int32_t)vm->memoria[dir + 1]) << 16;
     ret_ip |= ((int32_t)vm->memoria[dir + 2]) << 8;
     ret_ip |= ((int32_t)vm->memoria[dir + 3]);
