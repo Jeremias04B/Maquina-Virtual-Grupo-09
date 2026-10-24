@@ -37,7 +37,7 @@ PInstrucciones vectorIns[32] = {
         int64_t res = (int64_t)a - b;
 
         bool v = ((a > 0 && b < 0 && (int32_t)res < 0) || (a < 0 && b > 0 && (int32_t)res >= 0));
-        bool c = (uint32_t)a < (uint32_t)b;
+        bool c = ((uint32_t)a < (uint32_t)b) || (a < 0 && b > 0); //acarreo fixeado
 
         setValor(vm, vm->registros[REG_OP1], (int32_t)res);
         actualizarCC(vm, res, v, c);
@@ -77,7 +77,7 @@ PInstrucciones vectorIns[32] = {
         int64_t res = (int64_t)a - b;
 
         bool v = ((a > 0 && b < 0 && (int32_t)res < 0) || (a < 0 && b > 0 && (int32_t)res >= 0));
-        bool c = (uint32_t)a < (uint32_t)b;
+        bool c = ((uint32_t)a < (uint32_t)b) || (a < 0 && b > 0);
 
         actualizarCC(vm, res, v, c);
     }
@@ -119,7 +119,8 @@ PInstrucciones vectorIns[32] = {
         int32_t shift = getValorOP(vm, vm->registros[REG_OP2]);
         int32_t res = val << shift;
         setValor(vm, vm->registros[REG_OP1], res);
-        actualizarCC(vm, res, false, false);
+        bool c = ((val >> (32 - shift)) & 1) != 0; // O si el bit saliente fue 1
+        actualizarCC(vm, res, false, c);
     }
 
     void SHR(MaquinaVirtual *vm) {
@@ -231,7 +232,7 @@ void POP(MaquinaVirtual *vm) {
     // 1. Validar STACK UNDERFLOW
     // Si SP es mayor o igual a (SS + tamaño del segmento de pila), la pila está vacía/desbordada
     uint16_t ss_segment = (vm->registros[REG_SS] >> 16) & 0xFFFF;
-    uint16_t stack_size = vm->segmentTable[ss_segment].size;
+    uint16_t stack_size = vm->TablaSegmentos[ss_segment].size;
     
     // SP inicializado apunta a (SS + stack_size). Si al hacer POP supera o iguala dicho límite:
     if ((vm->registros[REG_SP] & 0xFFFF) + 4 > stack_size) {
@@ -280,7 +281,7 @@ void CALL(MaquinaVirtual *vm) {
 
 void RET(MaquinaVirtual *vm) {
     uint16_t ss_segment = (vm->registros[REG_SS] >> 16) & 0xFFFF;
-    uint16_t stack_size = vm->segmentTable[ss_segment].size;
+    uint16_t stack_size = vm->TablaSegmentos[ss_segment].size;
 
     if ((vm->registros[REG_SP] & 0xFFFF) + 4 > stack_size) {
         fprintf(stderr, "Error: STACK UNDERFLOW\n");
@@ -291,10 +292,10 @@ void RET(MaquinaVirtual *vm) {
     uint16_t dir = translate_address(vm, vm->registros[REG_SP], 4);
 
     int32_t ret_ip = 0;
-    ret_ip |= ((int32_t)vm->memory[dir])     << 24;
-    ret_ip |= ((int32_t)vm->memory[dir + 1]) << 16;
-    ret_ip |= ((int32_t)vm->memory[dir + 2]) << 8;
-    ret_ip |= ((int32_t)vm->memory[dir + 3]);
+    ret_ip |= ((int32_t)vm->memoria[dir])     << 24;
+    ret_ip |= ((int32_t)vm->memoria[dir + 1]) << 16;
+    ret_ip |= ((int32_t)vm->memoria[dir + 2]) << 8;
+    ret_ip |= ((int32_t)vm->memoria[dir + 3]);
 
     vm->registros[REG_IP] = ret_ip;
     vm->registros[REG_SP] += 4;
