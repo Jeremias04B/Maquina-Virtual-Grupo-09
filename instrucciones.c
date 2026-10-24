@@ -37,7 +37,7 @@ PInstrucciones vectorIns[32] = {
         int64_t res = (int64_t)a - b;
 
         bool v = ((a > 0 && b < 0 && (int32_t)res < 0) || (a < 0 && b > 0 && (int32_t)res >= 0));
-        bool c = (uint32_t)a < (uint32_t)b;
+        bool c = ((uint32_t)a < (uint32_t)b) || (a < 0 && b > 0); //acarreo fixeado
 
         setValor(vm, vm->registros[REG_OP1], (int32_t)res);
         actualizarCC(vm, res, v, c);
@@ -77,7 +77,7 @@ PInstrucciones vectorIns[32] = {
         int64_t res = (int64_t)a - b;
 
         bool v = ((a > 0 && b < 0 && (int32_t)res < 0) || (a < 0 && b > 0 && (int32_t)res >= 0));
-        bool c = (uint32_t)a < (uint32_t)b;
+        bool c = ((uint32_t)a < (uint32_t)b) || (a < 0 && b > 0);
 
         actualizarCC(vm, res, v, c);
     }
@@ -119,7 +119,8 @@ PInstrucciones vectorIns[32] = {
         int32_t shift = getValorOP(vm, vm->registros[REG_OP2]);
         int32_t res = val << shift;
         setValor(vm, vm->registros[REG_OP1], res);
-        actualizarCC(vm, res, false, false);
+        bool c = ((val >> (32 - shift)) & 1) != 0; // O si el bit saliente fue 1
+        actualizarCC(vm, res, false, c);
     }
 
     void SHR(MaquinaVirtual *vm) {
