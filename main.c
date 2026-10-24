@@ -97,10 +97,22 @@ int main(int argc, char *argv[]) {
 
     //segun el modo de ejecucion
     if (modo_disassembler) {
-       disassemble(vm.memoria, tamano_codigo);
-    } else {
-        ciclo_ejecucion(&vm);
-    }
+        if (version == 1) {
+            disassemble(vm.memoria, tamano_codigo);
+        } else {
+            disassemble_proceso(
+                vm.memoria,   // Puntero a la RAM de la máquina virtual[cite: 3]
+                version,      // 2[cite: 1, 3]
+                baseConst,    // Dirección física donde empieza el Const Segment[cite: 1, 3]
+                tamConst,     // Tamaño del Const Segment[cite: 1, 3]
+                baseCode,     // Dirección física donde empieza el Code Segment[cite: 1, 3]
+                tamCode,      // Tamaño del Code Segment[cite: 1, 3]
+                entryPoint    // Offset del entry point dentro del Code[cite: 1, 3]
+            );
+        }
+        } else {
+            ciclo_ejecucion(&vm);
+        }
 
     return 0;
 }
