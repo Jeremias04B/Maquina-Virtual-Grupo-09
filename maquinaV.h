@@ -34,6 +34,27 @@
 #define FLAG_C (1 << 29)
 #define FLAG_V (1 << 28)
 
+//para la 2da parte
+// Índices de segmentos en la tabla
+#define SEG_CS 0
+#define SEG_DS 1
+#define SEG_KS 2
+#define SEG_ES 3
+#define SEG_SS 4
+#define SEG_PS 5
+
+// Índices de registros (asegúrate de que coincidan con tu maquinaV.h)
+#define REG_IP 0
+#define REG_SP 24 // Ejemplo, ajustar según tu enum
+#define REG_BP 25
+#define REG_CS 26
+#define REG_DS 27
+#define REG_KS 28
+#define REG_ES 29
+#define REG_SS 30
+#define REG_PS 31
+
+
 typedef struct {
     uint16_t base;   // 2 bytes
     uint16_t size;   // 2 bytes
