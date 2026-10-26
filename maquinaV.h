@@ -47,6 +47,8 @@ typedef struct {
 
 //STRUCT PRINCIPAL MAQUINA VIRTUAL
 
+//AGREGAR vm->vmi.filename, vm->PAP
+
 typedef struct {
     uint8_t memoria[16384];                // RAM 16 KiB
     int32_t registros[32];                 // 32 Registros

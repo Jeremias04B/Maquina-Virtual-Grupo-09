@@ -312,7 +312,7 @@ void sys_clearscreen(MaquinaVirtual *vm) {
     // Secuencia de escape ANSI / comando para entornos Linux / POSIX
     printf("\033[H\033[J");
     fflush(stdout);
-    #endif
+        #endif
 }
 
 void sys_read(MaquinaVirtual *vm) {
@@ -445,6 +445,41 @@ void sys_stringwrite(MaquinaVirtual *vm) {
     fflush(stdout);
 }
 
+void sys_breakpoint(MaquinaVirtual *vm) {
+    // Si no se pasó un archivo de imagen por parámetro, se ignora el breakpoint
+    if (vm->vmi_filename == NULL) {
+        return;
+    }
+
+    // 1. Guardar el estado completo de la VM en el archivo .vmi
+    guardar_imagen_vmi(vm, vm->vmi_filename);
+
+    // 2. Pausar y esperar acción del usuario por consola
+    char opcion;
+    do {
+        printf("[BREAKPOINT IP: 0x%08X] Presione (g)o, (q)uit o ENTER para siguiente paso: ", 
+               vm->registros[REG_IP]);
+        
+        opcion = getchar();
+        
+        if (opcion == 'q' || opcion == 'Q') {
+            printf("Ejecución abortada por el usuario en breakpoint.\n");
+            exit(0); // Finaliza la VM preservando la imagen
+        } 
+        else if (opcion == 'g' || opcion == 'G') {
+            // Limpiar buffer de entrada y continuar ejecución
+            while (getchar() != '\n'); 
+            break; 
+        } 
+        else if (opcion == '\n' || opcion == '\r') {
+            // ENTER: Activar flag de ejecución paso a paso para forzar
+            // un breakpoint en la siguiente instrucción
+            vm->PAP = 1; 
+            break;
+        }
+    } while (1);
+}
+
 void SYS(MaquinaVirtual *vm) {
     int32_t sys_code = getValorOP(vm, vm->registros[REG_OP1]);
 
@@ -459,6 +494,12 @@ void SYS(MaquinaVirtual *vm) {
         break;
         case 4:sys_stringwrite;
         break;
+        case 0x0F:sys_breakpoint;
+        break;
+        default:{
+                printf("Llamada al sistema invalida (%d)\n",sys_code);
+                exit(1);
+        }
     }
 }
 
