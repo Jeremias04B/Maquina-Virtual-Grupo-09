@@ -468,7 +468,8 @@ void sys_breakpoint(MaquinaVirtual *vm) {
         } 
         else if (opcion == 'g' || opcion == 'G') {
             // Limpiar buffer de entrada y continuar ejecución
-            while (getchar() != '\n'); 
+            while (getchar() != '\n');
+            vm->PAP= 0; 
             break; 
         } 
         else if (opcion == '\n' || opcion == '\r') {
