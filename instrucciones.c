@@ -301,6 +301,20 @@ void RET(MaquinaVirtual *vm) {
     vm->registros[REG_SP] += 4;
 }
 
+void sys_clearscreen(MaquinaVirtual *vm) {
+    // La Syscall 0 no requiere ni modifica ningún registro de la VM
+    (void)vm; // Evita la advertencia del compilador por parámetro no utilizado
+
+    #if defined(_WIN32) || defined(_WIN64)
+    // Comando para consola de Windows (cmd)
+    system("cls");
+    #else
+    // Secuencia de escape ANSI / comando para entornos Linux / POSIX
+    printf("\033[H\033[J");
+    fflush(stdout);
+        #endif
+}
+
 void sys_read(MaquinaVirtual *vm) {
     uint32_t logical_base = vm->registros[REG_EDX];
     uint16_t cantidad = vm->registros[REG_ECX] & 0xFFFF;
@@ -385,14 +399,109 @@ void sys_write(MaquinaVirtual *vm) {
     }
 }
 
+void sys_stringread(MaquinaVirtual *vm) {
+    uint32_t base_logica = vm->registros[REG_EDX];
+    int32_t max_cant = vm->registros[REG_ECX]; 
+
+    uint32_t limite = (max_cant == -1) ? 0xFFFFFFFF : (max_cant & 0xFFFF);
+
+    uint32_t i = 0;
+    int c;
+
+    // Limpiar posibles saltos de línea residuales del búfer de entrada
+    while ((c = getchar()) == '\n' || c == '\r');
+
+    while (c != EOF && c != '\n' && c != '\r' && i < limite) {
+        //lectura caracter por caracter para validar limites de memoria
+        uint16_t dir_fisica = traducirD(vm, base_logica + i, 1);
+        
+        vm->memoria[dir_fisica] = (uint8_t)c;
+        i++;
+
+        if (i < limite) {
+            c = getchar();
+        }
+    }
+
+    uint16_t dir_fisica_null = traducirD(vm, base_logica + i, 1);
+    vm->memoria[dir_fisica_null] = '\0';
+}
+
+void sys_stringwrite(MaquinaVirtual *vm) {
+    uint32_t base_logica = vm->registros[REG_EDX];
+    uint32_t i = 0;
+
+    uint16_t dir_fisica = traducirD(vm, base_logica + i, 1);
+    char c = (char)vm->memoria[dir_fisica];
+
+    while (c != '\0') {
+        putchar(c);
+        i++;
+        dir_fisica = traducirD(vm, base_logica + i, 1);
+        c = (char)vm->memoria[dir_fisica];
+    }
+
+    // Forzar la salida en pantalla
+    fflush(stdout);
+}
+
+void sys_breakpoint(MaquinaVirtual *vm) {
+    // Si no se pasó un archivo de imagen por parámetro, se ignora el breakpoint
+    if (vm->vmi_filename == NULL) {
+        return;
+    }
+
+    // 1. Guardar el estado completo de la VM en el archivo .vmi
+    guardar_imagen_vmi(vm, vm->vmi_filename);
+
+    // 2. Pausar y esperar acción del usuario por consola
+    char opcion;
+    do {
+        printf("[BREAKPOINT IP: 0x%08X] Presione (g)o, (q)uit o ENTER para siguiente paso: ", 
+               vm->registros[REG_IP]);
+        
+        opcion = getchar();
+        
+        if (opcion == 'q' || opcion == 'Q') {
+            printf("Ejecución abortada por el usuario en breakpoint.\n");
+            exit(0); // Finaliza la VM preservando la imagen
+        } 
+        else if (opcion == 'g' || opcion == 'G') {
+            // Limpiar buffer de entrada y continuar ejecución
+            while (getchar() != '\n');
+            vm->PAP= 0; 
+            break; 
+        } 
+        else if (opcion == '\n' || opcion == '\r') {
+            // ENTER: Activar flag de ejecución paso a paso para forzar
+            // un breakpoint en la siguiente instrucción
+            vm->PAP = 1; 
+            break;
+        }
+    } while (1);
+}
+
 void SYS(MaquinaVirtual *vm) {
     int32_t sys_code = getValorOP(vm, vm->registros[REG_OP1]);
 
-    if (sys_code == 1) {
-        sys_read(vm);
-    } else if (sys_code == 2) {
-        sys_write(vm);
-    } 
+    switch (sys_code){
+        case 0: sys_clearscreen;
+        break;
+        case 1: sys_read;
+        break;
+        case 2: sys_write;
+        break;
+        case 3:sys_stringread;
+        break;
+        case 4:sys_stringwrite;
+        break;
+        case 0x0F:sys_breakpoint;
+        break;
+        default:{
+                printf("Llamada al sistema invalida (%d)\n",sys_code);
+                exit(1);
+        }
+    }
 }
 
     void STOP(MaquinaVirtual *vm) {
