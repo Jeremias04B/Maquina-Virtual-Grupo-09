@@ -125,3 +125,27 @@ char configmodo(int16_t v){
     }
 }
 
+void guardar_imagen_vmi(MaquinaVirtual *vm, const char *filename) {
+    FILE *file = fopen(filename, "wb");
+    if (file == NULL) {
+        fprintf(stderr, "Error: No se pudo crear o abrir el archivo de imagen %s\n", filename);
+        return;
+    }
+
+    fwrite("VMI26", sizeof(char), 5, file);
+
+    uint8_t version = 1;
+    fwrite(&version, sizeof(uint8_t), 1, file);
+
+    uint16_t ram_kib = (uint16_t)(vm->tam_memoria / 1024);
+    fwrite(&ram_kib, sizeof(uint16_t), 1, file);
+
+    fwrite(vm->registros, sizeof(int32_t), 32, file);
+
+    fwrite(vm->TablaSegmentos, sizeof(SegmentDescriptor), 8, file);
+
+    fwrite(vm->memoria, sizeof(uint8_t), vm->tam_memoria, file);
+
+    fclose(file);
+}
+

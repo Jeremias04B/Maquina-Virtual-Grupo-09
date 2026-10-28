@@ -17,6 +17,8 @@
 #define REG_LAR 4
 #define REG_MAR 5
 #define REG_MBR 6
+#define REG_SP  7
+#define REG_BP  8
 #define REG_EAX 10
 #define REG_EBX 11
 #define REG_ECX 12
@@ -27,6 +29,10 @@
 #define REG_CC  17
 #define REG_CS  26
 #define REG_DS  27
+#define REG_ES  28
+#define REG_SS  29
+#define REG_KS  30
+#define REG_PS  31
 
 // Mascaras para el Registro CC
 #define FLAG_N (1 << 31)
@@ -40,6 +46,8 @@ typedef struct {
 } SegmentDescriptor;
 
 //STRUCT PRINCIPAL MAQUINA VIRTUAL
+
+//AGREGAR vm->vmi.filename, vm->PAP, vm->tam_memoria
 
 typedef struct {
     uint8_t memoria[16384];                // RAM 16 KiB
