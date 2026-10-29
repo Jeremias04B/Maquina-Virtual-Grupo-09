@@ -70,5 +70,7 @@ void ciclo_ejecucion(MaquinaVirtual *vm){
         vm->registros[REG_IP] += offset_instruccion; 
         
         ejecutar_instruccion(vm);
+        if (vm->PAP == 1)
+            sys_breakpoint(vm);
     }
 }

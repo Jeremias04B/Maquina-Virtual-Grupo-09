@@ -67,7 +67,7 @@ int main(int argc, char *argv[]) {
 
     // 6. Derivar ejecución
     if (modo_disassembler) {
-       disassemble(vm.memoria, t_cs);
+       disassemble(vm.memoria, tamano_codigo);
     } else {
         ciclo_ejecucion(&vm);
     }
