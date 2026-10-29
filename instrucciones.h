@@ -39,6 +39,12 @@ void SYS(MaquinaVirtual *vm);
 void STOP(MaquinaVirtual *vm);
 void INVALID(MaquinaVirtual *vm);
 
+//nuevas instrucciones 
+void PUSH(MaquinaVirtual *vm); 
+void POP(MaquinaVirtual *vm); 
+void CALL(MaquinaVirtual *vm); 
+void RET(MaquinaVirtual *vm);
+
 typedef void (*PInstrucciones)(MaquinaVirtual *mv);
 
 extern PInstrucciones vectorIns[32]; 
