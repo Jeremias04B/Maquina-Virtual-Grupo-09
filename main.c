@@ -21,14 +21,34 @@ int main(int argc, char *argv[]) {
     }
 
     int modo_disassembler = 0;
-    int index_filename = 1;
-    int index_parametros = 2; 
+    int index_filename = -1;
+    int index_parametros = -1;
 
-    // Verificar si se pasó el flag -d al inicio
-    if (argc > 2 && strcmp(argv[1], "-d") == 0) {
-        modo_disassembler = 1;
-        index_filename = 2;
-        index_parametros = 3;
+    // 1. Recorrer los argumentos de la consola para identificar banderas y archivos
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "-d") == 0) {
+            modo_disassembler = 1;
+        } else if (strcmp(argv[i], "-p") == 0) {
+            index_parametros = i + 1; // Los parámetros del programa arrancan después de -p
+            break; // Todo lo que sigue a -p son los parámetros del ejecutable guest
+        } else if (strstr(argv[i], ".vmx") != NULL && index_filename == -1) {
+            index_filename = i;
+        }
+    }
+
+    // Si no se especificó un .vmx con extensión explícita, tomar el primer argumento que no sea una bandera
+    if (index_filename == -1) {
+        for (int i = 1; i < argc; i++) {
+            if (strcmp(argv[i], "-d") != 0 && strcmp(argv[i], "-p") != 0 && strncmp(argv[i], "m=", 2) != 0) {
+                index_filename = i;
+                break;
+            }
+        }
+    }
+
+    if (index_filename == -1 || index_filename >= argc) {
+        fprintf(stderr, "Error: No se especificó el archivo ejecutable .vmx\n");
+        return 1;
     }
 
     FILE *archivo = fopen(argv[index_filename], "rb");
@@ -36,6 +56,12 @@ int main(int argc, char *argv[]) {
         perror("Error al abrir el archivo");
         return 1;
     }
+
+    // Si no se pasó -p, usás la posición por defecto según si hay -d o no
+    if (index_parametros == -1) {
+        index_parametros = modo_disassembler ? 3 : 2;
+    }
+
 
     // 1. Leer y validar cabecera
     uint8_t version = 0;
@@ -166,22 +192,30 @@ int validar_y_leer_cabecera(FILE *archivo, uint8_t *version,
 
     return 0;
 }
-
+ //debe ignorar las flags 'm' o 'vmi'
 uint32_t calcular_tamano_ps(int argc, char *argv[], int index_filename, int index_parametros, int *cantidad_params) {
     uint32_t tamano_ps = 0;
-    int extras = argc - index_parametros;
-
-    if (extras >= 0 && index_filename < argc) {
-        *cantidad_params = 1 + (extras > 0 ? extras : 0);
-        tamano_ps += (*cantidad_params) * 4;
-        tamano_ps += strlen(argv[index_filename]) + 1;
-
+    
+    if (index_parametros > 0 && index_parametros < argc) {
+        int count_extras = 0;
         for (int i = index_parametros; i < argc; i++) {
+            if (strncmp(argv[i], "m=", 2) == 0 || strstr(argv[i], ".vmi") != NULL) continue;
+            count_extras++;
+        }
+        *cantidad_params = 1 + count_extras; // param0 (nombre ejecutable) + parámetros
+    } else {
+        *cantidad_params = 1; // Solo param0 (nombre del ejecutable)
+    }
+
+    // Calcular bytes requeridos en PS (arreglo de punteros + strings)
+    tamano_ps += (*cantidad_params) * 4;
+    tamano_ps += strlen(argv[index_filename]) + 1;
+
+    if (index_parametros > 0 && index_parametros < argc) {
+        for (int i = index_parametros; i < argc; i++) {
+            if (strncmp(argv[i], "m=", 2) == 0 || strstr(argv[i], ".vmi") != NULL) continue;
             tamano_ps += strlen(argv[i]) + 1;
         }
-    } else {
-        *cantidad_params = 0;
-        tamano_ps = 0;
     }
 
     return tamano_ps;
@@ -252,19 +286,23 @@ void cargar_parametros_ps(MaquinaVirtual *vm, int argc, char *argv[], int index_
     memcpy(&vm->memoria[base_ps + offset_strings], argv[index_filename], len_prog);
     offset_strings += len_prog;
 
-    // Parámetros adicionales
-    for (int i = index_parametros; i < argc; i++) {
-        dir_logica_str = (SEG_PS << 16) | offset_strings;
+ // Parámetros adicionales (param1, param2, ...) -> argv, argv, ... en la VM
+    if (index_parametros > 0 && index_parametros < argc) {
+        for (int i = index_parametros; i < argc; i++) {
+            if (strncmp(argv[i], "m=", 2) == 0 || strstr(argv[i], ".vmi") != NULL) continue;
 
-        vm->memoria[base_ps + offset_arreglo + 0] = (dir_logica_str >> 24) & 0xFF;
-        vm->memoria[base_ps + offset_arreglo + 1] = (dir_logica_str >> 16) & 0xFF;
-        vm->memoria[base_ps + offset_arreglo + 2] = (dir_logica_str >> 8)  & 0xFF;
-        vm->memoria[base_ps + offset_arreglo + 3] = dir_logica_str & 0xFF;
-        offset_arreglo += 4;
+            dir_logica_str = (SEG_PS << 16) | offset_strings;
 
-        size_t len_param = strlen(argv[i]) + 1;
-        memcpy(&vm->memoria[base_ps + offset_strings], argv[i], len_param);
-        offset_strings += len_param;
+            vm->memoria[base_ps + offset_arreglo + 0] = (dir_logica_str >> 24) & 0xFF;
+            vm->memoria[base_ps + offset_arreglo + 1] = (dir_logica_str >> 16) & 0xFF;
+            vm->memoria[base_ps + offset_arreglo + 2] = (dir_logica_str >> 8)  & 0xFF;
+            vm->memoria[base_ps + offset_arreglo + 3] = dir_logica_str & 0xFF;
+            offset_arreglo += 4;
+
+            size_t len_param = strlen(argv[i]) + 1;
+            memcpy(&vm->memoria[base_ps + offset_strings], argv[i], len_param);
+            offset_strings += len_param;
+        }
     }
 }
 
