@@ -17,7 +17,7 @@ void ciclo_ejecucion(MaquinaVirtual *vm);
 
 int main(int argc, char *argv[]) {
     if (argc < 2) {
-        fprintf(stderr, "Uso: %s filename.vmx|filename.vmi [-d] [-p param1 ...] [m=M]\n", argv);
+        fprintf(stderr, "Uso: %s filename.vmx|filename.vmi [-d] [-p param1 ...] [m=M]\n", argv[0]);
         return 1;
     }
 
@@ -372,7 +372,7 @@ int cargar_imagen_vmi(MaquinaVirtual *vm, const char *filename) {
     }
 
     // 1. Validar Header (8 bytes)
-    char identificador = {0};
+    char identificador[8] = {0};
     if (fread(identificador, sizeof(char), 5, archivo) != 5 || strncmp(identificador, "VMI26", 5) != 0) {
         fprintf(stderr, "Error: Identificador VMI invalido (debe ser VMI26)\n");
         fclose(archivo);
