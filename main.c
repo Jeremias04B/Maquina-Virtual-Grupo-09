@@ -2,17 +2,17 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
-#include "maquinaV.h" 
+#include "maquinaV.h"
 
-void disassemble(const uint8_t *code, uint16_t codeSize);
-void ciclo_ejecucion(MaquinaVirtual *vm);
-
-// --- Prototipos de funciones de inicializacion
-int validar_y_leer_cabecera(FILE *archivo, uint16_t *t_cs, uint16_t *t_ds, uint16_t *t_ks, uint16_t *t_es, uint16_t *t_ss);
-uint32_t calcular_tamano_ps(int argc, char *argv[], int index_parametros, int *cantidad_params);
+// Prototipos de funciones auxiliares
+uint32_t obtener_tamano_memoria(int argc, char *argv[]);
+int validar_y_leer_cabecera(FILE *archivo, uint8_t *version, uint16_t *t_cs, uint16_t *t_ds, uint16_t *t_ks, uint16_t *t_es, uint16_t *t_ss, uint16_t *entry_point);
+uint32_t calcular_tamano_ps(int argc, char *argv[], int index_filename, int index_parametros, int *cantidad_params);
 void configurar_descriptores_y_registros(MaquinaVirtual *vm, uint16_t t_cs, uint16_t t_ds, uint16_t t_ks, uint16_t t_es, uint16_t t_ss, uint32_t t_ps);
-void cargar_parametros_ps(MaquinaVirtual *vm, int argc, char *argv[], int index_parametros, int cantidad_params);
+void cargar_parametros_ps(MaquinaVirtual *vm, int argc, char *argv[], int index_filename, int index_parametros, int cantidad_params);
 void inicializar_pila(MaquinaVirtual *vm, uint16_t tamano_ss, int cantidad_params);
+void disassemble_proceso(const uint8_t *memoria, uint8_t version, uint32_t baseConst, uint32_t tamConst, uint32_t baseCode, uint32_t tamCode, uint32_t entryPoint);
+void ciclo_ejecucion(MaquinaVirtual *vm);
 
 int main(int argc, char *argv[]) {
     if (argc < 2) {
@@ -21,125 +21,183 @@ int main(int argc, char *argv[]) {
     }
 
     int modo_disassembler = 0;
+    int index_filename = 1;
     int index_parametros = 2; 
 
-    if (argc > 2 && strcmp(argv[2], "-d") == 0) {
+    // Verificar si se pasó el flag -d al inicio
+    if (argc > 2 && strcmp(argv[1], "-d") == 0) {
         modo_disassembler = 1;
+        index_filename = 2;
         index_parametros = 3;
     }
 
-    FILE *archivo = fopen(argv[1], "rb");
+    FILE *archivo = fopen(argv[index_filename], "rb");
     if (!archivo) {
         perror("Error al abrir el archivo");
         return 1;
     }
 
     // 1. Leer y validar cabecera
-    uint16_t t_cs, t_ds, t_ks, t_es, t_ss;
-    if (validar_y_leer_cabecera(archivo, &t_cs, &t_ds, &t_ks, &t_es, &t_ss) != 0) {
+    uint8_t version = 0;
+    uint16_t t_cs = 0, t_ds = 0, t_ks = 0, t_es = 0, t_ss = 0, entry_point = 0;
+    if (validar_y_leer_cabecera(archivo, &version, &t_cs, &t_ds, &t_ks, &t_es, &t_ss, &entry_point) != 0) {
         fclose(archivo);
         return 1;
     }
 
     // 2. Calcular memoria de parámetros (PS)
-    int cantidad_params;
-    uint32_t t_ps = calcular_tamano_ps(argc, argv, index_parametros, &cantidad_params);
+    int cantidad_params = 0;
+    uint32_t t_ps = calcular_tamano_ps(argc, argv, index_filename, index_parametros, &cantidad_params);
 
-    // 3. Inicializar Máquina Virtual
+    // 3. Inicializar Máquina Virtual y RAM
     MaquinaVirtual vm;
     memset(&vm, 0, sizeof(MaquinaVirtual)); 
+ 
+    //guardo el nombre del archivo
+    for (int i = 1; i < argc; i++) {
+        if (strstr(argv[i], ".vmi") != NULL) {
+            strncpy(vm.vmi_filename, argv[i], sizeof(vm.vmi_filename) - 1);
+            vm.vmi_filename[sizeof(vm.vmi_filename) - 1] = '\0';
+            break;
+        }
+    }
 
-    // Cargar las instrucciones del archivo en el Code Segment
-    if (fread(vm.memoria, sizeof(uint8_t), t_cs, archivo) != t_cs) {
-        fprintf(stderr, "Error al leer las instrucciones del archivo\n");
+
+    vm.tam_memoria = obtener_tamano_memoria(argc, argv);
+    vm.memoria = (uint8_t *)malloc(vm.tam_memoria);
+    if (!vm.memoria) {
+        fprintf(stderr, "Error: Memoria insuficiente al instanciar la RAM (%u bytes)\n", vm.tam_memoria);
         fclose(archivo);
         return 1;
     }
-    fclose(archivo);
+    memset(vm.memoria, 0, vm.tam_memoria);
 
-    // 4. Configurar segmentos, registros, parámetros y pila
+
+    // 4. Configurar descriptores, registros, parámetros y pila
     configurar_descriptores_y_registros(&vm, t_cs, t_ds, t_ks, t_es, t_ss, t_ps);
-    cargar_parametros_ps(&vm, argc, argv, index_parametros, cantidad_params);
+    cargar_parametros_ps(&vm, argc, argv, index_filename, index_parametros, cantidad_params);
     inicializar_pila(&vm, t_ss, cantidad_params);
 
-    // 5. Configurar el inicio de ejecución
-    vm.registros[REG_IP] = vm.registros[REG_CS]; // TODO: Lógica para buscar 'main' en VMX2
+    // 5. Cargar los segmentos desde el archivo a la memoria RAM
+    if (fread(&vm.memoria[vm.TablaSegmentos[SEG_CS].base], sizeof(uint8_t), t_cs, archivo) != t_cs) {
+        fprintf(stderr, "Error al leer el Code Segment\n");
+        fclose(archivo);
+        return 1;
+    }
 
-    // 6. Derivar ejecución
+    if (version == 2 && t_ks > 0) {
+        fread(&vm.memoria[vm.TablaSegmentos[SEG_KS].base], sizeof(uint8_t), t_ks, archivo);
+    }
+    fclose(archivo);
+
+    // 6. Configurar el inicio de ejecución
+    vm.registros[REG_IP] = vm.registros[REG_CS] | entry_point;
+
+    // 7. Derivar ejecución
     if (modo_disassembler) {
-       disassemble(vm.memoria, tamano_codigo);
+        disassemble_proceso(
+            vm.memoria,
+            version,
+            vm.TablaSegmentos[SEG_KS].base,
+            t_ks,
+            vm.TablaSegmentos[SEG_CS].base,
+            t_cs,
+            entry_point
+        );
     } else {
         ciclo_ejecucion(&vm);
     }
-
+    free(vm.memoria);
     return 0;
 }
 
-
 // =====================================================================
-// DEFINICIÓN DE FUNCIONES AUXILIARES
+// FUNCIONES AUXILIARES
 // =====================================================================
 
-int validar_y_leer_cabecera(FILE *archivo, uint16_t *t_cs, uint16_t *t_ds, uint16_t *t_ks, uint16_t *t_es, uint16_t *t_ss) {
+int validar_y_leer_cabecera(FILE *archivo, uint8_t *version, 
+                            uint16_t *t_cs, uint16_t *t_ds, uint16_t *t_ks, 
+                            uint16_t *t_es, uint16_t *t_ss, uint16_t *entry_point) {
+    
+    // 1. Vector de 6 posiciones para "VMX26" + '\0'
     char identificador[6] = {0};
     if (fread(identificador, sizeof(char), 5, archivo) != 5 || strncmp(identificador, "VMX26", 5) != 0) {
         fprintf(stderr, "Error: Identificador invalido. Debe ser 'VMX26'\n");
         return 1;
     }
 
-    uint8_t version = 0;
-    if (fread(&version, sizeof(uint8_t), 1, archivo) != 1 || (version != 1 && version != 2)) {
+    // 2. Versión (1 byte)
+    if (fread(version, sizeof(uint8_t), 1, archivo) != 1 || (*version != 1 && *version != 2)) {
         fprintf(stderr, "Error: Version no compatible (se requiere version 1 o 2)\n");
         return 1;
     }
 
-    // Valores por defecto para versión 1[cite: 1]
+    // Valores por defecto para versión 1
     *t_ds = 1024;
     *t_ks = 1024;
     *t_es = 1024;
     *t_ss = 1024;
+    *entry_point = 0;
 
-    if (version == 2) {
-        uint8_t buffer_header[10];
-        if (fread(buffer_header, sizeof(uint8_t), 10, archivo) != 10) {
-            fprintf(stderr, "Error al leer los tamanos de segmentos en VMX2\n");
+    if (*version == 2) {
+        // 3. Vector de 12 bytes para los descriptores de VMX2
+        uint8_t buffer_header[12];
+        if (fread(buffer_header, sizeof(uint8_t), 12, archivo) != 12) {
+            fprintf(stderr, "Error al leer los tamanos de segmentos y entry point en VMX2\n");
             return 1;
         }
-        *t_cs = ((uint16_t)buffer_header[0] << 8) | buffer_header[1];
-        *t_ds = ((uint16_t)buffer_header[2] << 8) | buffer_header[3];
-        *t_ks = ((uint16_t)buffer_header[4] << 8) | buffer_header[5];
-        *t_es = ((uint16_t)buffer_header[6] << 8) | buffer_header[7];
-        *t_ss = ((uint16_t)buffer_header[8] << 8) | buffer_header[9];
+
+        // Armar los enteros de 16 bits en Big-Endian usando los índices  a
+        *t_cs        = ((uint16_t)buffer_header[0]  << 8) | buffer_header[1];
+        *t_ds        = ((uint16_t)buffer_header[2]  << 8) | buffer_header[3];
+        *t_es        = ((uint16_t)buffer_header[4]  << 8) | buffer_header[5];
+        *t_ss        = ((uint16_t)buffer_header[6]  << 8) | buffer_header[7];
+        *t_ks        = ((uint16_t)buffer_header[8]  << 8) | buffer_header[9];
+        *entry_point = ((uint16_t)buffer_header[10] << 8) | buffer_header[11];
     } else {
-        uint8_t tam_bytes[2];
+        // 4. Vector de 2 bytes para VMX1
+        uint8_t tam_bytes[3];
         if (fread(tam_bytes, sizeof(uint8_t), 2, archivo) != 2) {
             fprintf(stderr, "Error al leer el tamano del codigo\n");
             return 1;
         }
         *t_cs = ((uint16_t)tam_bytes[0] << 8) | tam_bytes[1];
     }
+
     return 0;
 }
 
-uint32_t calcular_tamano_ps(int argc, char *argv[], int index_parametros, int *cantidad_params) {
+uint32_t calcular_tamano_ps(int argc, char *argv[], int index_filename, int index_parametros, int *cantidad_params) {
     uint32_t tamano_ps = 0;
-    *cantidad_params = argc - index_parametros;
-    
-    if (*cantidad_params > 0) {
-        tamano_ps += *cantidad_params * 4; // Arreglo de punteros
+    int extras = argc - index_parametros;
+
+    if (extras >= 0 && index_filename < argc) {
+        *cantidad_params = 1 + (extras > 0 ? extras : 0);
+        tamano_ps += (*cantidad_params) * 4;
+        tamano_ps += strlen(argv[index_filename]) + 1;
+
         for (int i = index_parametros; i < argc; i++) {
-            tamano_ps += strlen(argv[i]) + 1; // Longitud del string + '\0'
+            tamano_ps += strlen(argv[i]) + 1;
         }
     } else {
-        tamano_ps = 1024; // Valor por defecto si no hay parámetros
+        *cantidad_params = 0;
+        tamano_ps = 0;
     }
+
     return tamano_ps;
 }
 
 void configurar_descriptores_y_registros(MaquinaVirtual *vm, uint16_t t_cs, uint16_t t_ds, uint16_t t_ks, uint16_t t_es, uint16_t t_ss, uint32_t t_ps) {
     uint32_t base_actual = 0;
 
-    // Tabla de Segmentos[cite: 1]
+    vm->TablaSegmentos[SEG_PS].base = base_actual;
+    vm->TablaSegmentos[SEG_PS].size = t_ps;
+    base_actual += t_ps;
+
+    vm->TablaSegmentos[SEG_KS].base = base_actual;
+    vm->TablaSegmentos[SEG_KS].size = t_ks;
+    base_actual += t_ks;
+
     vm->TablaSegmentos[SEG_CS].base = base_actual;
     vm->TablaSegmentos[SEG_CS].size = t_cs;
     base_actual += t_cs;
@@ -147,10 +205,6 @@ void configurar_descriptores_y_registros(MaquinaVirtual *vm, uint16_t t_cs, uint
     vm->TablaSegmentos[SEG_DS].base = base_actual;
     vm->TablaSegmentos[SEG_DS].size = t_ds;
     base_actual += t_ds;
-
-    vm->TablaSegmentos[SEG_KS].base = base_actual;
-    vm->TablaSegmentos[SEG_KS].size = t_ks;
-    base_actual += t_ks;
 
     vm->TablaSegmentos[SEG_ES].base = base_actual;
     vm->TablaSegmentos[SEG_ES].size = t_es;
@@ -160,68 +214,95 @@ void configurar_descriptores_y_registros(MaquinaVirtual *vm, uint16_t t_cs, uint
     vm->TablaSegmentos[SEG_SS].size = t_ss;
     base_actual += t_ss;
 
-    vm->TablaSegmentos[SEG_PS].base = base_actual;
-    vm->TablaSegmentos[SEG_PS].size = t_ps;
-
-    // Entradas 6 y 7 inactivas[cite: 1]
     for (int i = 6; i < 8; i++) {
         vm->TablaSegmentos[i].base = 0xFFFF;   
         vm->TablaSegmentos[i].size = 0xFFFF; 
     }
 
-    // Registros
-    vm->registros[REG_CS] = SEG_CS << 16;
-    vm->registros[REG_DS] = SEG_DS << 16;
-    vm->registros[REG_KS] = SEG_KS << 16;
-    vm->registros[REG_ES] = SEG_ES << 16;
-    vm->registros[REG_SS] = SEG_SS << 16;
-    vm->registros[REG_PS] = SEG_PS << 16;
+    vm->registros[REG_PS] = (t_ps > 0) ? (SEG_PS << 16) : 0xFFFFFFFF;
+    vm->registros[REG_KS] = (t_ks > 0) ? (SEG_KS << 16) : 0xFFFFFFFF;
+    vm->registros[REG_CS] = (t_cs > 0) ? (SEG_CS << 16) : 0xFFFFFFFF;
+    vm->registros[REG_DS] = (t_ds > 0) ? (SEG_DS << 16) : 0xFFFFFFFF;
+    vm->registros[REG_ES] = (t_es > 0) ? (SEG_ES << 16) : 0xFFFFFFFF;
+    vm->registros[REG_SS] = (t_ss > 0) ? (SEG_SS << 16) : 0xFFFFFFFF;
+
+    if (base_actual > vm->tam_memoria) {
+    fprintf(stderr, "Error: Memoria insuficiente en la RAM (%u bytes requeridos, %u disponibles).\n", 
+     base_actual, vm->tam_memoria);
+    exit(1);
+  }
 }
 
-void cargar_parametros_ps(MaquinaVirtual *vm, int argc, char *argv[], int index_parametros, int cantidad_params) {
-    uint32_t base_ps = vm->TablaSegmentos[SEG_PS].base;
-    uint32_t offset_arreglo = 0; 
-    uint32_t offset_strings = cantidad_params * 4; 
+void cargar_parametros_ps(MaquinaVirtual *vm, int argc, char *argv[], int index_filename, int index_parametros, int cantidad_params) {
+    if (cantidad_params == 0 || index_filename >= argc) return;
 
-    if (cantidad_params > 0) {
-        for (int i = index_parametros; i < argc; i++) {
-            uint32_t dir_logica_str = (SEG_PS << 16) | offset_strings;
-            
-            // Puntero en Little-Endian[cite: 1]
-            vm->memoria[base_ps + offset_arreglo + 0] = dir_logica_str & 0xFF;
-            vm->memoria[base_ps + offset_arreglo + 1] = (dir_logica_str >> 8) & 0xFF;
-            vm->memoria[base_ps + offset_arreglo + 2] = (dir_logica_str >> 16) & 0xFF;
-            vm->memoria[base_ps + offset_arreglo + 3] = (dir_logica_str >> 24) & 0xFF;
-            offset_arreglo += 4;
-            
-            // Copiar cadena con memcpy[cite: 1]
-            size_t longitud = strlen(argv[i]) + 1;
-            memcpy(&vm->memoria[base_ps + offset_strings], argv[i], longitud);
-            offset_strings += longitud;
-        }
+    uint32_t base_ps = vm->TablaSegmentos[SEG_PS].base;
+    uint32_t offset_arreglo = 0;
+    uint32_t offset_strings = cantidad_params * 4;
+
+    // param0: Nombre del ejecutable (.vmx)
+    uint32_t dir_logica_str = (SEG_PS << 16) | offset_strings;
+    vm->memoria[base_ps + offset_arreglo + 0] = (dir_logica_str >> 24) & 0xFF;
+    vm->memoria[base_ps + offset_arreglo + 1] = (dir_logica_str >> 16) & 0xFF;
+    vm->memoria[base_ps + offset_arreglo + 2] = (dir_logica_str >> 8)  & 0xFF;
+    vm->memoria[base_ps + offset_arreglo + 3] = dir_logica_str & 0xFF;
+    offset_arreglo += 4;
+
+    size_t len_prog = strlen(argv[index_filename]) + 1;
+    memcpy(&vm->memoria[base_ps + offset_strings], argv[index_filename], len_prog);
+    offset_strings += len_prog;
+
+    // Parámetros adicionales
+    for (int i = index_parametros; i < argc; i++) {
+        dir_logica_str = (SEG_PS << 16) | offset_strings;
+
+        vm->memoria[base_ps + offset_arreglo + 0] = (dir_logica_str >> 24) & 0xFF;
+        vm->memoria[base_ps + offset_arreglo + 1] = (dir_logica_str >> 16) & 0xFF;
+        vm->memoria[base_ps + offset_arreglo + 2] = (dir_logica_str >> 8)  & 0xFF;
+        vm->memoria[base_ps + offset_arreglo + 3] = dir_logica_str & 0xFF;
+        offset_arreglo += 4;
+
+        size_t len_param = strlen(argv[i]) + 1;
+        memcpy(&vm->memoria[base_ps + offset_strings], argv[i], len_param);
+        offset_strings += len_param;
     }
 }
 
 void inicializar_pila(MaquinaVirtual *vm, uint16_t tamano_ss, int cantidad_params) {
     uint32_t puntero_sp = tamano_ss; 
 
-    // Macro local solo para no repetir código dentro de esta función
     #define PUSH_INICIAL(val) \
         puntero_sp -= 4; \
-        vm->memoria[vm->TablaSegmentos[SEG_SS].base + puntero_sp + 0] = (val) & 0xFF; \
-        vm->memoria[vm->TablaSegmentos[SEG_SS].base + puntero_sp + 1] = ((val) >> 8) & 0xFF; \
-        vm->memoria[vm->TablaSegmentos[SEG_SS].base + puntero_sp + 2] = ((val) >> 16) & 0xFF; \
-        vm->memoria[vm->TablaSegmentos[SEG_SS].base + puntero_sp + 3] = ((val) >> 24) & 0xFF;
+        vm->memoria[vm->TablaSegmentos[SEG_SS].base + puntero_sp + 0] = ((val) >> 24) & 0xFF; \
+        vm->memoria[vm->TablaSegmentos[SEG_SS].base + puntero_sp + 1] = ((val) >> 16) & 0xFF; \
+        vm->memoria[vm->TablaSegmentos[SEG_SS].base + puntero_sp + 2] = ((val) >> 8) & 0xFF;  \
+        vm->memoria[vm->TablaSegmentos[SEG_SS].base + puntero_sp + 3] = (val) & 0xFF;
 
     uint32_t puntero_argv = (cantidad_params > 0) ? (SEG_PS << 16) : 0xFFFFFFFF;
     
-    // Dejar la pila precargada como exige el procesador[cite: 1]
     PUSH_INICIAL(puntero_argv);       
     PUSH_INICIAL(cantidad_params);    
     PUSH_INICIAL(0xFFFFFFFF);         
 
     #undef PUSH_INICIAL
 
-    vm->registros[REG_SP] = puntero_sp;
-    vm->registros[REG_BP] = puntero_sp; 
+    vm->registros[REG_SP] = (SEG_SS << 16) | puntero_sp;
+    vm->registros[REG_BP] = (SEG_SS << 16) | puntero_sp; 
+}
+
+/**
+ * Recorre argv buscando la opción "m=M" (ej: "m=32").
+ * Retorna el tamaño total de la memoria RAM expresado en BYTES.
+ */
+uint32_t obtener_tamano_memoria(int argc, char *argv[]) {
+    for (int i = 1; i < argc; i++) {
+        // Verificar si el argumento comienza con "m="
+        if (strncmp(argv[i], "m=", 2) == 0) {
+            int val = atoi(argv[i]+ 2);  //saltea m y lee el numero
+            if (val > 0) {
+                return (uint32_t)val * 1024; // Retorna M en KiB convertidos a bytes
+            }
+        }
+    }
+    return RAM_SIZE;
 }

@@ -1,3 +1,0 @@
-MOV EAX, 5
-ADD EAX, 3
-STOP

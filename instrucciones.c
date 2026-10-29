@@ -11,6 +11,8 @@ PInstrucciones vectorIns[32] = {
     [0x18] = XOR,     [0x19] = SWAP,    [0x1A] = SHL,     [0x1B] = SHR,
     [0x1C] = SAR,     [0x1D] = LDL,     [0x1E] = LDH,     [0x1F] = RND
 };
+    void guardar_imagen_vmi(MaquinaVirtual *vm, const char *filename);
+
     void MOV(MaquinaVirtual *vm) {
         int32_t b = getValorOP(vm, vm->registros[REG_OP2]);
         setValor(vm, vm->registros[REG_OP1], b);
@@ -211,52 +213,43 @@ void NOT(MaquinaVirtual *vm) {
     actualizarCC(vm, res, false, false);
 }
 
-void PUSH(MaquinaVirtual *vm){
-    vm->registros[REG_SP] -=4;
-    if (vm->registros[REG_SP] < vm->registros[REG_SS]){
+// PUSH: Decrementa SP en 4, valida Stack Overflow y escribe en Big-Endian
+void PUSH(MaquinaVirtual *vm) {
+    vm->registros[REG_SP] -= 4;
+
+    // Validar STACK OVERFLOW (si SP cae por debajo de la base del segmento SS)
+    if (vm->registros[REG_SP] < vm->registros[REG_SS]) {
         fprintf(stderr, "Error: STACK OVERFLOW\n");
         STOP(vm);
         exit(1);
     }
-    else{
-        int32_t val = getValorOP(vm, vm->registros[REG_OP1]);
-        int32_t dir= traducirD(vm,vm->registros[REG_SP],4);
-        vm->memoria[dir]     = (val >> 24) & 0xFF;
-        vm->memoria[dir + 1] = (val >> 16) & 0xFF;
-        vm->memoria[dir + 2] = (val >> 8)  & 0xFF;
-        vm->memoria[dir + 3] =  val        & 0xFF; 
-    }
+
+    int32_t val = getValorOP(vm, vm->registros[REG_OP1]);
+    uint16_t dir = traducirD(vm, vm->registros[REG_SP], 4);
+
+    write_mem32(vm, dir, val);
 }
 
+// POP: Valida Stack Underflow, lee en Big-Endian, guarda en destino e incrementa SP
 void POP(MaquinaVirtual *vm) {
-    // 1. Validar STACK UNDERFLOW
-    // Si SP es mayor o igual a (SS + tamaño del segmento de pila), la pila está vacía/desbordada
     uint16_t ss_segment = (vm->registros[REG_SS] >> 16) & 0xFFFF;
     uint16_t stack_size = vm->TablaSegmentos[ss_segment].size;
-    
-    // SP inicializado apunta a (SS + stack_size). Si al hacer POP supera o iguala dicho límite:
+
+    // Validar STACK UNDERFLOW
     if ((vm->registros[REG_SP] & 0xFFFF) + 4 > stack_size) {
         fprintf(stderr, "Error: STACK UNDERFLOW\n");
         STOP(vm);
         exit(1);
     }
 
-    // 2. Traducir la dirección lógica del tope de la pila (SP) a dirección física
     uint16_t dir = traducirD(vm, vm->registros[REG_SP], 4);
-
-    // 3. Extraer 4 bytes en orden BIG-ENDIAN (reconstruir el valor de 32 bits)
-    // El byte en la dirección apuntada por SP es el más significativo (MSB)
-    int32_t val = 0;
-    val |= ((int32_t)vm->memoria[dir])     << 24;
-    val |= ((int32_t)vm->memoria[dir + 1]) << 16;
-    val |= ((int32_t)vm->memoria[dir + 2]) << 8;
-    val |= ((int32_t)vm->memoria[dir + 3]);
+    int32_t val = read_mem32(vm, dir);
 
     setValor(vm, vm->registros[REG_OP1], val);
-
     vm->registros[REG_SP] += 4;
 }
 
+// CALL: Apila la dirección de retorno (IP) y salta a la dirección destino
 void CALL(MaquinaVirtual *vm) {
     int32_t offset_destino = getValorOP(vm, vm->registros[REG_OP1]);
 
@@ -271,14 +264,13 @@ void CALL(MaquinaVirtual *vm) {
     uint16_t dir = traducirD(vm, vm->registros[REG_SP], 4);
     int32_t ret_ip = vm->registros[REG_IP];
 
-    vm->memoria[dir]     = (ret_ip >> 24) & 0xFF;
-    vm->memoria[dir + 1] = (ret_ip >> 16) & 0xFF;
-    vm->memoria[dir + 2] = (ret_ip >> 8)  & 0xFF;
-    vm->memoria[dir + 3] =  ret_ip        & 0xFF;
+    write_mem32(vm, dir, ret_ip);
 
+    // Actualizar IP apuntando al nuevo offset dentro del Code Segment
     vm->registros[REG_IP] = (vm->registros[REG_CS] & 0xFFFF0000) | (offset_destino & 0x0000FFFF);
 }
 
+// RET: Desapila la dirección de retorno guardada en la pila y la asigna a IP
 void RET(MaquinaVirtual *vm) {
     uint16_t ss_segment = (vm->registros[REG_SS] >> 16) & 0xFFFF;
     uint16_t stack_size = vm->TablaSegmentos[ss_segment].size;
@@ -289,13 +281,8 @@ void RET(MaquinaVirtual *vm) {
         exit(1);
     }
 
-    uint16_t dir = translate_address(vm, vm->registros[REG_SP], 4);
-
-    int32_t ret_ip = 0;
-    ret_ip |= ((int32_t)vm->memoria[dir])     << 24;
-    ret_ip |= ((int32_t)vm->memoria[dir + 1]) << 16;
-    ret_ip |= ((int32_t)vm->memoria[dir + 2]) << 8;
-    ret_ip |= ((int32_t)vm->memoria[dir + 3]);
+    uint16_t dir = traducirD(vm, vm->registros[REG_SP], 4);
+    int32_t ret_ip = read_mem32(vm, dir);
 
     vm->registros[REG_IP] = ret_ip;
     vm->registros[REG_SP] += 4;
@@ -447,7 +434,7 @@ void sys_stringwrite(MaquinaVirtual *vm) {
 
 void sys_breakpoint(MaquinaVirtual *vm) {
     // Si no se pasó un archivo de imagen por parámetro, se ignora el breakpoint
-    if (vm->vmi_filename == NULL) {
+    if (vm->vmi_filename[0] == '\0') {
         return;
     }
 
@@ -485,17 +472,17 @@ void SYS(MaquinaVirtual *vm) {
     int32_t sys_code = getValorOP(vm, vm->registros[REG_OP1]);
 
     switch (sys_code){
-        case 0: sys_clearscreen;
+        case 0: sys_clearscreen(vm);
         break;
-        case 1: sys_read;
+        case 1: sys_read(vm);
         break;
-        case 2: sys_write;
+        case 2: sys_write(vm);
         break;
-        case 3:sys_stringread;
+        case 3:sys_stringread(vm);
         break;
-        case 4:sys_stringwrite;
+        case 4:sys_stringwrite(vm);
         break;
-        case 0x0F:sys_breakpoint;
+        case 0x0F:sys_breakpoint(vm);
         break;
         default:{
                 printf("Llamada al sistema invalida (%d)\n",sys_code);
