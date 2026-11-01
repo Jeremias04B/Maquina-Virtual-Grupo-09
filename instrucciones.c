@@ -462,6 +462,12 @@ void sys_breakpoint(MaquinaVirtual *vm) {
         else if (opcion == '\n' || opcion == '\r') {
             // ENTER: Activar flag de ejecución paso a paso para forzar
             // un breakpoint en la siguiente instrucción
+            if (opcion == '\r') {
+                int c = getchar();
+                if (c != '\n' && c != EOF) {
+                    ungetc(c, stdin); // Si no era '\n', lo devuelve al búfer
+                }
+            }
             vm->PAP = 1; 
             break;
         }

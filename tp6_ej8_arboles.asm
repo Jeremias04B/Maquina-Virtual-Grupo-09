@@ -52,6 +52,7 @@ leer_otro: MOV EAX, 0x01
 
         JMP leer_otro       
 
+        SYS 0x0F
 
 leer_fin: MOV EDX, DS
         MOV EAX, [EDX+4]    
