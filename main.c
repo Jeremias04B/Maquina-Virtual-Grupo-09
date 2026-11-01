@@ -4,7 +4,6 @@
 #include <string.h>
 #include "maquinaV.h"
 
-// Prototipos de funciones auxiliares
 int cargar_imagen_vmi(MaquinaVirtual *vm, const char *filename);
 uint32_t obtener_tamano_memoria(int argc, char *argv[]);
 int validar_y_leer_cabecera(FILE *archivo, uint8_t *version, uint16_t *t_cs, uint16_t *t_ds, uint16_t *t_ks, uint16_t *t_es, uint16_t *t_ss, uint16_t *entry_point);
@@ -25,7 +24,7 @@ int main(int argc, char *argv[]) {
     int index_filename = -1;
     int index_parametros = -1;
 
-    // 1. Recorrer los argumentos de la consola para identificar banderas y archivos
+    // recorrer los argumentos de la consola para identificar banderas y archivos
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "-d") == 0) {
             modo_disassembler = 1;
@@ -37,7 +36,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    // Si no se especificó con extensión explícita, tomar el primer argumento que no sea una bandera
+    // ri no se especifico con extension explícita, tomar el primer argumento que no sea una bandera
     if (index_filename == -1) {
         for (int i = 1; i < argc; i++) {
             if (strcmp(argv[i], "-d") != 0 && strcmp(argv[i], "-p") != 0 && strncmp(argv[i], "m=", 2) != 0) {
@@ -52,37 +51,31 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    // =====================================================================
-    // ATROPELLO/DESVÍO PARA ARCHIVOS DE IMAGEN (.VMI)
-    // =====================================================================
     if (strstr(argv[index_filename], ".vmi") != NULL) {
         MaquinaVirtual vm;
         memset(&vm, 0, sizeof(MaquinaVirtual));
 
         if (cargar_imagen_vmi(&vm, argv[index_filename]) == 0) {
-            ciclo_ejecucion(&vm); // Reanuda la ejecución directamente en el IP guardado
+            ciclo_ejecucion(&vm); // reanuda la ejecucion directamente en el IP guardado
             free(vm.memoria);
-            return 0; // Finaliza la ejecución exitosamente
+            return 0; // finaliza la ejecucion exitosamente
         }
-        return 1; // Error al cargar la imagen
+        return 1; // error al cargar la imagen
     }
 
-    // =====================================================================
-    // FLUJO NORMAL PARA ARCHIVOS EJECUTABLES (.VMX)
-    // =====================================================================
     FILE *archivo = fopen(argv[index_filename], "rb");
     if (!archivo) {
         perror("Error al abrir el archivo .vmx");
         return 1;
     }
 
-    // Si no se pasó -p, usás la posición por defecto según si hay -d o no
+    // si no se paso -p, usa la posicion por defecto 
     if (index_parametros == -1) {
         index_parametros = modo_disassembler ? 3 : 2;
     }
 
 
-    // 1. Leer y validar cabecera
+    // leer y validar cabecera
     uint8_t version = 0;
     uint16_t t_cs = 0, t_ds = 0, t_ks = 0, t_es = 0, t_ss = 0, entry_point = 0;
     if (validar_y_leer_cabecera(archivo, &version, &t_cs, &t_ds, &t_ks, &t_es, &t_ss, &entry_point) != 0) {
@@ -90,11 +83,11 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    // 2. Calcular memoria de parámetros (PS)
+    //calcular memoria de parametros (PS)
     int cantidad_params = 0;
     uint32_t t_ps = calcular_tamano_ps(argc, argv, index_filename, index_parametros, &cantidad_params);
 
-    // 3. Inicializar Máquina Virtual y RAM
+    // inicializar mv y ram
     MaquinaVirtual vm;
     memset(&vm, 0, sizeof(MaquinaVirtual)); 
  
@@ -118,12 +111,12 @@ int main(int argc, char *argv[]) {
     memset(vm.memoria, 0, vm.tam_memoria);
 
 
-    // 4. Configurar descriptores, registros, parámetros y pila
+    //configurar descriptores, registros, parametros y pila
     configurar_descriptores_y_registros(&vm, t_cs, t_ds, t_ks, t_es, t_ss, t_ps);
     cargar_parametros_ps(&vm, argc, argv, index_filename, index_parametros, cantidad_params);
     inicializar_pila(&vm, t_ss, cantidad_params);
 
-    // 5. Cargar los segmentos desde el archivo a la memoria RAM
+    // cargar los segmentos desde el archivo a la memoria RAM
     if (fread(&vm.memoria[vm.TablaSegmentos[SEG_CS].base], sizeof(uint8_t), t_cs, archivo) != t_cs) {
         fprintf(stderr, "Error al leer el Code Segment\n");
         fclose(archivo);
@@ -135,10 +128,10 @@ int main(int argc, char *argv[]) {
     }
     fclose(archivo);
 
-    // 6. Configurar el inicio de ejecución
+    // configurar el inicio de ejecucion
     vm.registros[REG_IP] = vm.registros[REG_CS] | entry_point;
 
-    // 7. Derivar ejecución
+    // derivar ejecucion
     if (modo_disassembler) {
         disassemble_proceso(
             vm.memoria,
@@ -156,28 +149,26 @@ int main(int argc, char *argv[]) {
     return 0;
 }
 
-// =====================================================================
-// FUNCIONES AUXILIARES
-// =====================================================================
+//funciones aux
 
 int validar_y_leer_cabecera(FILE *archivo, uint8_t *version, 
                             uint16_t *t_cs, uint16_t *t_ds, uint16_t *t_ks, 
                             uint16_t *t_es, uint16_t *t_ss, uint16_t *entry_point) {
     
-    // 1. Vector de 6 posiciones para "VMX26" + '\0'
+    // vector de 6 posiciones para "VMX26" + '\0'
     char identificador[6] = {0};
     if (fread(identificador, sizeof(char), 5, archivo) != 5 || strncmp(identificador, "VMX26", 5) != 0) {
         fprintf(stderr, "Error: Identificador invalido. Debe ser 'VMX26'\n");
         return 1;
     }
 
-    // 2. Versión (1 byte)
+    // version (1 byte)
     if (fread(version, sizeof(uint8_t), 1, archivo) != 1 || (*version != 1 && *version != 2)) {
         fprintf(stderr, "Error: Version no compatible (se requiere version 1 o 2)\n");
         return 1;
     }
 
-    // Valores por defecto para versión 1
+    // valores por defecto para versión 1
     *t_ds = 1024;
     *t_ks = 1024;
     *t_es = 1024;
@@ -185,14 +176,14 @@ int validar_y_leer_cabecera(FILE *archivo, uint8_t *version,
     *entry_point = 0;
 
     if (*version == 2) {
-        // 3. Vector de 12 bytes para los descriptores de VMX2
+        // vector de 12 bytes para los descriptores de VMX2
         uint8_t buffer_header[12];
         if (fread(buffer_header, sizeof(uint8_t), 12, archivo) != 12) {
             fprintf(stderr, "Error al leer los tamanos de segmentos y entry point en VMX2\n");
             return 1;
         }
 
-        // Armar los enteros de 16 bits en Big-Endian usando los índices  a
+        // armar los enteros de 16 bits en Big-Endian usando los índices  a
         *t_cs        = ((uint16_t)buffer_header[0]  << 8) | buffer_header[1];
         *t_ds        = ((uint16_t)buffer_header[2]  << 8) | buffer_header[3];
         *t_es        = ((uint16_t)buffer_header[4]  << 8) | buffer_header[5];
@@ -200,7 +191,7 @@ int validar_y_leer_cabecera(FILE *archivo, uint8_t *version,
         *t_ks        = ((uint16_t)buffer_header[8]  << 8) | buffer_header[9];
         *entry_point = ((uint16_t)buffer_header[10] << 8) | buffer_header[11];
     } else {
-        // 4. Vector de 2 bytes para VMX1
+        // vector de 2 bytes para VMX1
         uint8_t tam_bytes[3];
         if (fread(tam_bytes, sizeof(uint8_t), 2, archivo) != 2) {
             fprintf(stderr, "Error al leer el tamano del codigo\n");
@@ -221,12 +212,12 @@ uint32_t calcular_tamano_ps(int argc, char *argv[], int index_filename, int inde
             if (strncmp(argv[i], "m=", 2) == 0 || strstr(argv[i], ".vmi") != NULL) continue;
             count_extras++;
         }
-        *cantidad_params = 1 + count_extras; // param0 (nombre ejecutable) + parámetros
+        *cantidad_params = 1 + count_extras; // param0 (nombre ejecutable) + parametros
     } else {
-        *cantidad_params = 1; // Solo param0 (nombre del ejecutable)
+        *cantidad_params = 1; // solo param0 (nombre del ejecutable)
     }
 
-    // Calcular bytes requeridos en PS (arreglo de punteros + strings)
+    // calcular bytes requeridos en PS 
     tamano_ps += (*cantidad_params) * 4;
     tamano_ps += strlen(argv[index_filename]) + 1;
 
@@ -293,7 +284,7 @@ void cargar_parametros_ps(MaquinaVirtual *vm, int argc, char *argv[], int index_
     uint32_t offset_arreglo = 0;
     uint32_t offset_strings = cantidad_params * 4;
 
-    // param0: Nombre del ejecutable (.vmx)
+    // param0: nombre del ejecutable (.vmx)
     uint32_t dir_logica_str = (SEG_PS << 16) | offset_strings;
     vm->memoria[base_ps + offset_arreglo + 0] = (dir_logica_str >> 24) & 0xFF;
     vm->memoria[base_ps + offset_arreglo + 1] = (dir_logica_str >> 16) & 0xFF;
@@ -305,7 +296,7 @@ void cargar_parametros_ps(MaquinaVirtual *vm, int argc, char *argv[], int index_
     memcpy(&vm->memoria[base_ps + offset_strings], argv[index_filename], len_prog);
     offset_strings += len_prog;
 
- // Parámetros adicionales (param1, param2, ...) -> argv, argv, ... en la VM
+ // parametros adicionales
     if (index_parametros > 0 && index_parametros < argc) {
         for (int i = index_parametros; i < argc; i++) {
             if (strncmp(argv[i], "m=", 2) == 0 || strstr(argv[i], ".vmi") != NULL) continue;
@@ -347,17 +338,14 @@ void inicializar_pila(MaquinaVirtual *vm, uint16_t tamano_ss, int cantidad_param
     vm->registros[REG_BP] = (SEG_SS << 16) | puntero_sp; 
 }
 
-/**
- * Recorre argv buscando la opción "m=M" (ej: "m=32").
- * Retorna el tamaño total de la memoria RAM expresado en BYTES.
- */
+// recorre argv buscando la opcion "m=M" .retorna el tamaño total de la memoria RAM expresado en BYTES.
 uint32_t obtener_tamano_memoria(int argc, char *argv[]) {
     for (int i = 1; i < argc; i++) {
-        // Verificar si el argumento comienza con "m="
+
         if (strncmp(argv[i], "m=", 2) == 0) {
             int val = atoi(argv[i]+ 2);  //saltea m y lee el numero
             if (val > 0) {
-                return (uint32_t)val * 1024; // Retorna M en KiB convertidos a bytes
+                return (uint32_t)val * 1024; // retorna M en KiB convertidos a bytes
             }
         }
     }
@@ -371,7 +359,7 @@ int cargar_imagen_vmi(MaquinaVirtual *vm, const char *filename) {
         return 1;
     }
 
-    // 1. Validar Header (8 bytes)
+    // validar header (8 bytes)
     char identificador[8] = {0};
     if (fread(identificador, sizeof(char), 5, archivo) != 5 || strncmp(identificador, "VMI26", 5) != 0) {
         fprintf(stderr, "Error: Identificador VMI invalido (debe ser VMI26)\n");
@@ -385,7 +373,7 @@ int cargar_imagen_vmi(MaquinaVirtual *vm, const char *filename) {
     uint16_t ram_kib = 0;
     fread(&ram_kib, sizeof(uint16_t), 1, archivo);
 
-    // 2. Asignar RAM en la VM
+    // asignar RAM en la mv
     vm->tam_memoria = (uint32_t)ram_kib * 1024;
     vm->memoria = (uint8_t *)malloc(vm->tam_memoria);
     if (!vm->memoria) {
@@ -394,18 +382,18 @@ int cargar_imagen_vmi(MaquinaVirtual *vm, const char *filename) {
         return 1;
     }
 
-    // 3. Cargar Registros (128 bytes)
+    //cargar registros 
     fread(vm->registros, sizeof(int32_t), 32, archivo);
 
-    // 4. Cargar Tabla de Descriptores de Segmentos (32 bytes)
+    // cargar tabla de descriptores de segmentos
     fread(vm->TablaSegmentos, sizeof(SegmentDescriptor), 8, archivo);
 
-    // 5. Cargar el volcado completo de la Memoria RAM
+    //cargar el volcado completo de la RAM
     fread(vm->memoria, sizeof(uint8_t), vm->tam_memoria, archivo);
 
-    // Guardar el nombre por si ocurren nuevos breakpoints
+    // guardar el nombre por si ocurren nuevos breakpoints
     strncpy(vm->vmi_filename, filename, sizeof(vm->vmi_filename) - 1);
 
     fclose(archivo);
-    return 0; // Exito
+    return 0; 
 }

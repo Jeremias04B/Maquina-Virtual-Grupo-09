@@ -24,13 +24,13 @@ uint16_t traducirD(MaquinaVirtual *vm, uint32_t dirLogica, uint16_t access_bytes
 
     uint16_t dirFisica = base + offset;
 
-    // Actualiza registros hardware de control de memoria
+    // actualiza registros hardware de control de memoria
     vm->registros[REG_LAR] = dirLogica;
     vm->registros[REG_MAR] = ((uint32_t)access_bytes << 16) | dirFisica;
 
     return dirFisica;
 } 
-// Lectura de 32 bits en Big-Endian (MSB en la dirección base)
+
 int32_t read_mem32(MaquinaVirtual *vm, uint16_t dirFisica) {
     int32_t val = 0;
     val |= ((uint32_t)vm->memoria[dirFisica])     << 24;
@@ -42,7 +42,6 @@ int32_t read_mem32(MaquinaVirtual *vm, uint16_t dirFisica) {
     return val;
 }
 
-// Escritura de 32 bits en Big-Endian (MSB en la dirección base)
 void write_mem32(MaquinaVirtual *vm, uint16_t dirFisica, int32_t val) {
     vm->registros[REG_MBR] = val;
     vm->memoria[dirFisica]     = (val >> 24) & 0xFF;
@@ -53,43 +52,43 @@ void write_mem32(MaquinaVirtual *vm, uint16_t dirFisica, int32_t val) {
 
 
 
-// Auxiliar para resolver la dirección lógica y la cantidad de bytes de un operando de memoria MV2
+// Auxiliar para resolver la direccion lógica y la cantidad de bytes de un operando de memoria
 uint32_t resolver_dir_memoria_mv2(MaquinaVirtual *vm, uint32_t op_val, uint16_t *out_cant_bytes) {
-    uint8_t cod_reg = op_val & 0x1F;                     // Bits 0-4: Código del registro base
-    uint8_t bits_cant = (op_val >> 5) & 0x07;            // Bits 5-7: Modificador de tamaño (b, w, l)
-    int16_t offset = (int16_t)((op_val >> 8) & 0xFFFF);  // Bits 8-23: Desplazamiento con signo
+    uint8_t cod_reg = op_val & 0x1F;                     // bits 0-4: codigo del registro base
+    uint8_t bits_cant = (op_val >> 5) & 0x07;            // bits 5-7: modificador de tamaño (b, w, l)
+    int16_t offset = (int16_t)((op_val >> 8) & 0xFFFF);  // bits 8-23: desplazamiento con signo
 
-    // Mapear modificador binario a cantidad de bytes real
-    if (bits_cant == 1)      *out_cant_bytes = 1; // 'b' (1 byte)
-    else if (bits_cant == 2) *out_cant_bytes = 2; // 'w' (2 bytes / word)
-    else                     *out_cant_bytes = 4; // 'l' (4 bytes / long, por defecto)
+    // mapear modificador binario a cantidad de bytes real
+    if (bits_cant == 1)      *out_cant_bytes = 1; // b 1 byte
+    else if (bits_cant == 2) *out_cant_bytes = 2; // w 2 bytes 
+    else                     *out_cant_bytes = 4; // l 4 bytes 
 
     return vm->registros[cod_reg] + offset;
 }
 
-// Obtener valor de operando según su tipo en OP1/OP2 (Actualizado para MV2)
+// obtener valor de operando segun su tipo en OP1/OP2 (actualizado)
 int32_t getValorOP(MaquinaVirtual *vm, uint32_t reg_op) {
     uint8_t tipo = (reg_op >> 24) & 0xFF;
     uint32_t val = reg_op & 0x00FFFFFF;  
 
     switch (tipo) {
-        case 0x01: { // Registro (Soporte para subsectores AL, AH, AX, EAX)
+        case 0x01: { 
             uint8_t cod_reg = val & 0x1F;
-            uint8_t sec_reg = (val >> 5) & 0x03; // Bits 5-6: Sector de registro
+            uint8_t sec_reg = (val >> 5) & 0x03; 
             int32_t reg_val = vm->registros[cod_reg];
 
             switch (sec_reg) {
-                case 0: return reg_val;                        // 00: Registro completo (32 bits, ej: EAX)
-                case 1: return (int8_t)(reg_val & 0xFF);       // 01: Byte bajo (ej: AL)
-                case 2: return (int8_t)((reg_val >> 8) & 0xFF);// 10: Byte alto (ej: AH)
-                case 3: return (int16_t)(reg_val & 0xFFFF);    // 11: Word bajo (16 bits, ej: AX)
+                case 0: return reg_val;                        // 00 registro completo 
+                case 1: return (int8_t)(reg_val & 0xFF);       // 01 byte bajo
+                case 2: return (int8_t)((reg_val >> 8) & 0xFF);// 10 byte alto
+                case 3: return (int16_t)(reg_val & 0xFFFF);    // 11 bord bajo
                 default: return reg_val;
             }
         }
-        case 0x02: // Inmediato (16 bits signed)
+        case 0x02: // inmediato
             return (int16_t)(val & 0xFFFF);
 
-        case 0x03: { // Memoria (Soporte para modificadores b, w, l)
+        case 0x03: { //memoria 
             uint16_t cant_bytes = 4;
             uint32_t dirLogica = resolver_dir_memoria_mv2(vm, val, &cant_bytes);
             uint16_t phys = traducirD(vm, dirLogica, cant_bytes);
@@ -103,7 +102,7 @@ int32_t getValorOP(MaquinaVirtual *vm, uint32_t reg_op) {
                 dato = read_mem32(vm, phys);
             }
 
-            vm->registros[REG_MBR] = dato; // Cargar MBR según especificación
+            vm->registros[REG_MBR] = dato; // cargar mbr
             return dato;
         }
         default:
@@ -111,35 +110,35 @@ int32_t getValorOP(MaquinaVirtual *vm, uint32_t reg_op) {
     }
 }
 
-// Escribir resultado en el destino (Registro o Memoria - Actualizado para MV2)
+// escribir resultado en el destino (actualizado)
 void setValor(MaquinaVirtual *vm, uint32_t reg_op, int32_t val) {
     uint8_t tipo = (reg_op >> 24) & 0xFF;
     uint32_t target = reg_op & 0x00FFFFFF;
 
-    if (tipo == 0x01) { // Registro (Soporte para subsectores)
+    if (tipo == 0x01) { 
         uint8_t cod_reg = target & 0x1F;
         uint8_t sec_reg = (target >> 5) & 0x03;
 
-        switch (sec_reg) {
-            case 0: // 00: Registro completo (32 bits)
+        switch (sec_reg) { //registro
+            case 0: 
                 vm->registros[cod_reg] = val;
                 break;
-            case 1: // 01: Byte bajo (AL) - Preserva los 24 bits superiores
+            case 1: 
                 vm->registros[cod_reg] = (vm->registros[cod_reg] & 0xFFFFFF00) | (val & 0xFF);
                 break;
-            case 2: // 10: Byte alto (AH) - Preserva los demás bits
+            case 2: 
                 vm->registros[cod_reg] = (vm->registros[cod_reg] & 0xFFFF00FF) | ((val & 0xFF) << 8);
                 break;
-            case 3: // 11: Word bajo (AX) - Preserva los 16 bits superiores
+            case 3:
                 vm->registros[cod_reg] = (vm->registros[cod_reg] & 0xFFFF0000) | (val & 0xFFFF);
                 break;
         }
-    } else if (tipo == 0x03) { // Memoria (Soporte para 1, 2 o 4 bytes)
+    } else if (tipo == 0x03) { // memoria 
         uint16_t cant_bytes = 4;
         uint32_t dirLogica = resolver_dir_memoria_mv2(vm, target, &cant_bytes);
         uint16_t phys = traducirD(vm, dirLogica, cant_bytes);
 
-        vm->registros[REG_MBR] = val; // Cargar MBR según especificación
+        vm->registros[REG_MBR] = val; // cargar mbr
 
         if (cant_bytes == 1) {
             vm->memoria[phys] = val & 0xFF;

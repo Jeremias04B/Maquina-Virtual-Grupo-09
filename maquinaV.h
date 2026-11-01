@@ -9,9 +9,6 @@
 
 #define RAM_SIZE 16384 // 16 KiB por defecto
 
-// =====================================================================
-// ÍNDICES DE REGISTROS DE LA MÁQUINA VIRTUAL (32 posiciones) [cite: 132]
-// =====================================================================
 #define REG_IP  0
 #define REG_OPC 1
 #define REG_OP1 2
@@ -39,17 +36,12 @@
 #define REG_KS  30
 #define REG_PS  31
 
-// =====================================================================
-// MÁSCARAS PARA EL REGISTRO CC (Flags) [cite: 6]
-// =====================================================================
+
 #define FLAG_N (1U << 31)
 #define FLAG_Z (1U << 30)
 #define FLAG_C (1U << 29)
 #define FLAG_V (1U << 28)
 
-// =====================================================================
-// ÍNDICES DE SEGMENTOS EN LA TABLA DE DESCRIPTORES
-// =====================================================================
 #define SEG_PS 0
 #define SEG_KS 1
 #define SEG_CS 2
@@ -57,19 +49,17 @@
 #define SEG_ES 4
 #define SEG_SS 5
 
-// =====================================================================
-// ESTRUCTURAS PRINCIPALES
-// =====================================================================
+
 typedef struct {
-    uint16_t base;   // Dirección física base (2 bytes) [cite: 121]
-    uint16_t size;   // Tamaño del segmento en bytes (2 bytes) [cite: 121]
+    uint16_t base;   // direccion fisica base 
+    uint16_t size;   // tamaño del segmento en bytes 
 } SegmentDescriptor;
 
 typedef struct {
-    uint8_t *memoria;             // RAM de 16 KiB [cite: 120]
+    uint8_t *memoria;             // RAM de 16 KiB 
     uint32_t tam_memoria;
-    int32_t registros[32];                 // 32 Registros de 32 bits [cite: 120]
-    SegmentDescriptor TablaSegmentos[8];    // Tabla de descriptores de segmentos [cite: 121]
+    int32_t registros[32];                 // 32 registros de 32 bits 
+    SegmentDescriptor TablaSegmentos[8];    // tabla de descriptores de segmentos 
     char vmi_filename[256]; 
     uint8_t PAP;
 } MaquinaVirtual;
