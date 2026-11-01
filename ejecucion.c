@@ -20,6 +20,11 @@ void ciclo_ejecucion(MaquinaVirtual *vm) {
     // [IP != 0xFFFFFFFF] indica que el proceso sigue activo (STOP pone IP en 0xFFFFFFFF)
     while((uint32_t)vm->registros[REG_IP] != 0xFFFFFFFF){
 
+         // Verificación de Paso a Paso / Breakpoint, no hace el primero 2 veces
+        if (vm->PAP == 1) {
+            sys_breakpoint(vm);
+        }
+
         // 1. Traducción de la dirección lógica (IP) a física
         uint16_t segmento = (vm->registros[REG_IP] >> 16) & 0xFFFF; // 2 bytes altos: Segmento
         uint16_t offset   = vm->registros[REG_IP] & 0xFFFF;         // 2 bytes bajos: Desplazamiento
@@ -90,9 +95,5 @@ void ciclo_ejecucion(MaquinaVirtual *vm) {
         // EXECUTE: Ejecutar la instrucción
         ejecutar_instruccion(vm);
 
-        // Verificación de Paso a Paso / Breakpoint
-        if (vm->PAP == 1) {
-            sys_breakpoint(vm);
-        }
     }
 }
