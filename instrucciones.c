@@ -213,43 +213,52 @@ void NOT(MaquinaVirtual *vm) {
     actualizarCC(vm, res, false, false);
 }
 
-// PUSH: Decrementa SP en 4, valida Stack Overflow y escribe en Big-Endian
-void PUSH(MaquinaVirtual *vm) {
-    vm->registros[REG_SP] -= 4;
-
-    // Validar STACK OVERFLOW (si SP cae por debajo de la base del segmento SS)
-    if (vm->registros[REG_SP] < vm->registros[REG_SS]) {
+void PUSH(MaquinaVirtual *vm){
+    vm->registros[REG_SP] -=4;
+    if (vm->registros[REG_SP] < vm->registros[REG_SS]){
         fprintf(stderr, "Error: STACK OVERFLOW\n");
         STOP(vm);
         exit(1);
     }
-
-    int32_t val = getValorOP(vm, vm->registros[REG_OP1]);
-    uint16_t dir = traducirD(vm, vm->registros[REG_SP], 4);
-
-    write_mem32(vm, dir, val);
+    else{
+        int32_t val = getValorOP(vm, vm->registros[REG_OP1]);
+        int32_t dir= traducirD(vm,vm->registros[REG_SP],4);
+        vm->memoria[dir]     = (val >> 24) & 0xFF;
+        vm->memoria[dir + 1] = (val >> 16) & 0xFF;
+        vm->memoria[dir + 2] = (val >> 8)  & 0xFF;
+        vm->memoria[dir + 3] =  val        & 0xFF; 
+    }
 }
 
-// POP: Valida Stack Underflow, lee en Big-Endian, guarda en destino e incrementa SP
 void POP(MaquinaVirtual *vm) {
+    // 1. Validar STACK UNDERFLOW
+    // Si SP es mayor o igual a (SS + tamaño del segmento de pila), la pila está vacía/desbordada
     uint16_t ss_segment = (vm->registros[REG_SS] >> 16) & 0xFFFF;
     uint16_t stack_size = vm->TablaSegmentos[ss_segment].size;
-
-    // Validar STACK UNDERFLOW
+    
+    // SP inicializado apunta a (SS + stack_size). Si al hacer POP supera o iguala dicho límite:
     if ((vm->registros[REG_SP] & 0xFFFF) + 4 > stack_size) {
         fprintf(stderr, "Error: STACK UNDERFLOW\n");
         STOP(vm);
         exit(1);
     }
 
+    // 2. Traducir la dirección lógica del tope de la pila (SP) a dirección física
     uint16_t dir = traducirD(vm, vm->registros[REG_SP], 4);
-    int32_t val = read_mem32(vm, dir);
+
+    // 3. Extraer 4 bytes en orden BIG-ENDIAN (reconstruir el valor de 32 bits)
+    // El byte en la dirección apuntada por SP es el más significativo (MSB)
+    int32_t val = 0;
+    val |= ((int32_t)vm->memoria[dir])     << 24;
+    val |= ((int32_t)vm->memoria[dir + 1]) << 16;
+    val |= ((int32_t)vm->memoria[dir + 2]) << 8;
+    val |= ((int32_t)vm->memoria[dir + 3]);
 
     setValor(vm, vm->registros[REG_OP1], val);
+
     vm->registros[REG_SP] += 4;
 }
 
-// CALL: Apila la dirección de retorno (IP) y salta a la dirección destino
 void CALL(MaquinaVirtual *vm) {
     int32_t offset_destino = getValorOP(vm, vm->registros[REG_OP1]);
 
@@ -264,13 +273,14 @@ void CALL(MaquinaVirtual *vm) {
     uint16_t dir = traducirD(vm, vm->registros[REG_SP], 4);
     int32_t ret_ip = vm->registros[REG_IP];
 
-    write_mem32(vm, dir, ret_ip);
+    vm->memoria[dir]     = (ret_ip >> 24) & 0xFF;
+    vm->memoria[dir + 1] = (ret_ip >> 16) & 0xFF;
+    vm->memoria[dir + 2] = (ret_ip >> 8)  & 0xFF;
+    vm->memoria[dir + 3] =  ret_ip        & 0xFF;
 
-    // Actualizar IP apuntando al nuevo offset dentro del Code Segment
     vm->registros[REG_IP] = (vm->registros[REG_CS] & 0xFFFF0000) | (offset_destino & 0x0000FFFF);
 }
 
-// RET: Desapila la dirección de retorno guardada en la pila y la asigna a IP
 void RET(MaquinaVirtual *vm) {
     uint16_t ss_segment = (vm->registros[REG_SS] >> 16) & 0xFFFF;
     uint16_t stack_size = vm->TablaSegmentos[ss_segment].size;
@@ -282,7 +292,12 @@ void RET(MaquinaVirtual *vm) {
     }
 
     uint16_t dir = traducirD(vm, vm->registros[REG_SP], 4);
-    int32_t ret_ip = read_mem32(vm, dir);
+
+    int32_t ret_ip = 0;
+    ret_ip |= ((int32_t)vm->memoria[dir])     << 24;
+    ret_ip |= ((int32_t)vm->memoria[dir + 1]) << 16;
+    ret_ip |= ((int32_t)vm->memoria[dir + 2]) << 8;
+    ret_ip |= ((int32_t)vm->memoria[dir + 3]);
 
     vm->registros[REG_IP] = ret_ip;
     vm->registros[REG_SP] += 4;
@@ -438,11 +453,6 @@ void sys_breakpoint(MaquinaVirtual *vm) {
         return;
     }
 
-    if(vm->PAP == 0){
-        vm->PAP= 1;
-        return;
-    }
-
     // 1. Guardar el estado completo de la VM en el archivo .vmi
     guardar_imagen_vmi(vm, vm->vmi_filename);
 
@@ -465,19 +475,9 @@ void sys_breakpoint(MaquinaVirtual *vm) {
             break; 
         } 
         else if (opcion == '\n' || opcion == '\r') {
-<<<<<<< HEAD
             // ENTER: Activar flag de ejecución paso a paso para forzar
             // un breakpoint en la siguiente instrucción
-            if (opcion == '\r') {
-                int c = getchar();
-                if (c != '\n' && c != EOF) {
-                    ungetc(c, stdin); // Si no era '\n', lo devuelve al búfer
-                }
-            }
             vm->PAP = 1; 
-=======
-            // dejar PAP en 1
->>>>>>> afce185e9a6e3204ef9455632e02cd3f6f6b9a01
             break;
         }
     } while (1);
