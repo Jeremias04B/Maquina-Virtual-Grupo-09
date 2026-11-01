@@ -438,6 +438,11 @@ void sys_breakpoint(MaquinaVirtual *vm) {
         return;
     }
 
+    if(vm->PAP == 0){
+        vm->PAP= 1;
+        return;
+    }
+
     // 1. Guardar el estado completo de la VM en el archivo .vmi
     guardar_imagen_vmi(vm, vm->vmi_filename);
 
@@ -460,6 +465,7 @@ void sys_breakpoint(MaquinaVirtual *vm) {
             break; 
         } 
         else if (opcion == '\n' || opcion == '\r') {
+<<<<<<< HEAD
             // ENTER: Activar flag de ejecución paso a paso para forzar
             // un breakpoint en la siguiente instrucción
             if (opcion == '\r') {
@@ -469,6 +475,9 @@ void sys_breakpoint(MaquinaVirtual *vm) {
                 }
             }
             vm->PAP = 1; 
+=======
+            // dejar PAP en 1
+>>>>>>> afce185e9a6e3204ef9455632e02cd3f6f6b9a01
             break;
         }
     } while (1);
